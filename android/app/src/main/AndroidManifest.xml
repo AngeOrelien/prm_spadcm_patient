@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="prm_spadcm_patient"
+        android:label="MySPAD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
