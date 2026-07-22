@@ -154,6 +154,26 @@ class OtpLoginController extends StateNotifier<OtpLoginState> {
   void reinitialiser() {
     state = const OtpLoginState();
   }
+
+  /// ⚠️ TEST — connexion directe sans passer par l'écran OTP.
+  Future<bool> connexionTest({
+    required String email,
+    required String motDePasse,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final patient = await _authRepository.connexionTest(
+        email: email,
+        motDePasse: motDePasse,
+      );
+      _authController.connecte(patient);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on AppException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    }
+  }
 }
 
 final otpLoginControllerProvider =

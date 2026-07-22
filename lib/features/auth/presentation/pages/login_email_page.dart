@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/extensions/context_extensions.dart';
@@ -42,11 +43,37 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     super.dispose();
   }
 
+  // Future<void> _soumettre() async {
+  //   if (!_formKey.currentState!.validate()) return;
+  //
+  //   final controller = ref.read(otpLoginControllerProvider.notifier);
+  //   final succes = await controller.demanderCode(
+  //     email: _emailController.text.trim(),
+  //     motDePasse: _passwordController.text,
+  //   );
+  //
+  //   if (!mounted) return;
+  //
+  //   if (succes) {
+  //     Navigator.of(context).push(
+  //       MaterialPageRoute(builder: (_) => const OtpVerificationPage()),
+  //     );
+  //   } else {
+  //     final erreur = ref.read(otpLoginControllerProvider).errorMessage;
+  //     context.showError(erreur ?? 'Email ou mot de passe incorrect');
+  //   }
+  // }
   Future<void> _soumettre() async {
     if (!_formKey.currentState!.validate()) return;
 
     final controller = ref.read(otpLoginControllerProvider.notifier);
-    final succes = await controller.demanderCode(
+
+    final succes = kDebugMode
+        ? await controller.connexionTest(
+      email: _emailController.text.trim(),
+      motDePasse: _passwordController.text,
+    )
+        : await controller.demanderCode(
       email: _emailController.text.trim(),
       motDePasse: _passwordController.text,
     );
@@ -54,6 +81,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     if (!mounted) return;
 
     if (succes) {
+      if (kDebugMode) return; // déjà connecté, pas d'écran OTP à afficher
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const OtpVerificationPage()),
       );

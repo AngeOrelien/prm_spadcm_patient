@@ -25,6 +25,14 @@ class ApiConstants {
   static const String refreshToken = '/auth/refresh-token';
   static const String me = '/auth/me';
 
+  // --- Tableau de bord santé (UC2) : agrégat servi en un seul appel par
+  // GET /api/patients/moi/dashboard, voir `DashboardRemoteDataSource`. ---
+  static const String monDossier = '/patients/moi';
+  static const String monTableauDeBord = '/patients/moi/dashboard';
+
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);
+
+  // test login route
+  static const String testLogin = '/auth/test/login';
 }

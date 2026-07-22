@@ -21,4 +21,10 @@ abstract class AuthRepository {
   Future<Patient?> restaurerSession();
 
   Future<void> deconnecter();
+
+  /// ⚠️ TEST — connexion en un seul appel, sans étape OTP.
+  Future<Patient> connexionTest({
+    required String email,
+    required String motDePasse,
+  });
 }

@@ -55,4 +55,22 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> deconnecter() => _storage.clear();
+
+  @override
+  Future<Patient> connexionTest({
+    required String email,
+    required String motDePasse,
+  }) async {
+    final data = await _remoteDataSource.loginTest(
+      email: email.trim().toLowerCase(),
+      motDePasse: motDePasse,
+    );
+
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+
+    return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
+  }
 }
