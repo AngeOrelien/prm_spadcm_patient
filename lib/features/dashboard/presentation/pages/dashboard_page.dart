@@ -125,7 +125,7 @@ class _TableauDeBordContenu extends StatelessWidget {
                 libelle: 'Traitements en cours',
                 icon: Icons.medication_outlined,
                 couleur: AppColors.primary,
-                onTap: () => context.go('/soins'),
+                onTap: () => context.go('/dossier'),
               ),
               StatCard(
                 valeur: tableau.prochainRendezVous != null
@@ -134,7 +134,7 @@ class _TableauDeBordContenu extends StatelessWidget {
                 libelle: 'Prochain rendez-vous',
                 icon: Icons.event_outlined,
                 couleur: AppColors.info,
-                onTap: () => context.go('/rendez-vous'),
+                onTap: () => context.go('/dossier'),
               ),
               StatCard(
                 valeur: '${tableau.alertesOuvertes.length}',
@@ -164,7 +164,7 @@ class _TableauDeBordContenu extends StatelessWidget {
         SectionTitle(
           titre: 'Dernières constantes',
           trailing: TextButton(
-            onPressed: () => context.go('/soins'),
+            onPressed: () => context.go('/dossier'),
             child: const Text('Tout voir'),
           ),
         ),
@@ -199,7 +199,7 @@ class _TableauDeBordContenu extends StatelessWidget {
         SectionTitle(
           titre: 'Prochain rendez-vous',
           trailing: TextButton(
-            onPressed: () => context.go('/rendez-vous'),
+            onPressed: () => context.go('/dossier'),
             child: const Text('Calendrier'),
           ),
         ),

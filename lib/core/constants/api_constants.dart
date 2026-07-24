@@ -35,4 +35,23 @@ class ApiConstants {
 
   // test login route
   static const String testLogin = '/auth/test/login';
+
+  // --- Soins : catalogue, souscription, paiements (README section 3.1 /
+  // routes/soinRoutes.js + souscriptionRoutes.js — pas encore montées côté
+  // backend, datasource branchée sur le mock en attendant, cf. AppConfig). ---
+  static const String catalogueSoins = '/soins';
+  static const String souscriptions = '/souscriptions';
+  static const String mesPaiements = '/paiements/moi';
+
+  // --- Dossier médical : traitements, rapports, documents, rendez-vous ---
+  static const String mesTraitements = '/patients/moi/traitements';
+  static const String mesRapports = '/patients/moi/rapports';
+  static const String mesAppreciations = '/appreciations';
+  static const String mesDocuments = '/patients/moi/documents';
+  static const String mesRendezVous = '/patients/moi/rendezvous';
+
+  // --- Messagerie & compte famille & alertes ---
+  static const String conversations = '/conversations';
+  static const String membresFamille = '/patients/moi/membres-famille';
+  static const String alertes = '/alertes';
 }

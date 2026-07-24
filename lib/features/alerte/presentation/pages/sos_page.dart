@@ -1,21 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
+import '../providers/alerte_providers.dart';
 
 /// Déclenchement d'une alerte SOS (UC4 "Déclencher alerte SOS").
 ///
 /// Ouverte en plein écran (pas nichée dans un onglet) via le bouton flottant
 /// toujours visible du shell, pour rester atteignable en un geste depuis
-/// n'importe quel onglet. La logique d'envoi réelle (création d'une
-/// `Alerte` + notification push FCM au coordonnateur/AVS de garde, cf.
-/// section 3 du README — relation `<<include>>` vers le service de
-/// notifications) sera branchée en Phase 3.
-class SosPage extends StatelessWidget {
+/// n'importe quel onglet. Tant que le vrai service de notifications FCM
+/// n'est pas branché (Phase 3), l'alerte est créée côté mock et apparaît
+/// immédiatement dans le badge "alertes ouvertes" de l'Accueil.
+class SosPage extends ConsumerWidget {
   const SosPage({super.key});
 
+  Future<void> _confirmer(BuildContext context, WidgetRef ref) async {
+    final succes = await ref.read(declenchementAlerteControllerProvider.notifier).declencher();
+    if (!context.mounted) return;
+    if (succes) {
+      Navigator.of(context).maybePop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Alerte envoyée : l'AVS de garde et le coordonnateur ont été notifiés.")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("L'envoi de l'alerte a échoué, réessayez.")),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final envoiEnCours = ref.watch(declenchementAlerteControllerProvider).isLoading;
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -59,16 +76,17 @@ class SosPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                   ),
-                  onPressed: () {
-                    // TODO(Phase 3): POST /api/alertes + notification FCM.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Envoi de l\'alerte bientôt disponible.')),
-                    );
-                  },
-                  child: const Text(
-                    'Confirmer l\'alerte',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  onPressed: envoiEnCours ? null : () => _confirmer(context, ref),
+                  child: envoiEnCours
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.sos),
+                        )
+                      : const Text(
+                          'Confirmer l\'alerte',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),

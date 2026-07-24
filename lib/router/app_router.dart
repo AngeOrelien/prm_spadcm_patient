@@ -8,10 +8,10 @@ import '../features/auth/presentation/pages/login_email_page.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/documents/presentation/pages/documents_page.dart';
+import '../features/dossier/presentation/pages/dossier_page.dart';
 import '../features/messagerie/presentation/pages/messagerie_page.dart';
 import '../features/profil/presentation/pages/profil_page.dart';
-import '../features/rendezvous/presentation/pages/rendezvous_page.dart';
-import '../features/soins/presentation/pages/journal_soins_page.dart';
+import '../features/soins/presentation/pages/soins_page.dart';
 import '../screens/splash_screen.dart';
 import '../shared/widgets/navigation/patient_shell.dart';
 
@@ -69,10 +69,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DocumentsPage(),
       ),
 
-      // --- Bottom navigation persistante du patient ---
-      // Chaque branche garde sa propre pile de navigation (utile dès que
-      // "Soins" ou "Rendez-vous" auront des écrans de détail poussés
-      // depuis leur liste).
+      // --- Bottom navigation persistante du patient (5 onglets, README 7.1) ---
+      // Accueil / Soins / Dossier / Messages / Profil. Chaque branche garde
+      // sa propre pile de navigation (utile pour les écrans de détail
+      // poussés depuis une liste, ex: le chat depuis Messages).
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return PatientShell(navigationShell: navigationShell);
@@ -86,17 +86,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/soins', builder: (context, state) => const JournalSoinsPage()),
+              GoRoute(path: '/soins', builder: (context, state) => const SoinsPage()),
             ],
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/rendez-vous', builder: (context, state) => const RendezVousPage()),
+              GoRoute(path: '/dossier', builder: (context, state) => const DossierPage()),
             ],
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/messagerie', builder: (context, state) => const MessageriePage()),
+              GoRoute(path: '/messages', builder: (context, state) => const MessageriePage()),
             ],
           ),
           StatefulShellBranch(

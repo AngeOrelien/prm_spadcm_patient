@@ -8,16 +8,16 @@ import '../../../core/theme/app_colors.dart';
 /// onglet garde sa propre pile de navigation et son propre état lorsqu'on
 /// bascule de l'un à l'autre.
 ///
-/// 5 onglets : Accueil (UC2), Soins (UC3), Rendez-vous (UC6), Messagerie
-/// (UC8), Profil (UC7). Le bouton SOS (UC4) — l'action la plus critique de
-/// l'app — n'est volontairement PAS un onglet : c'est un bouton flottant
-/// permanent (`FloatingActionButton.extended`, `centerFloat`), toujours
-/// visible et atteignable en un geste quel que soit l'onglet actif, plutôt
-/// que de partager l'attention avec le reste de la navigation.
-///
-/// Documents médicaux (UC5) reste également hors navigation : c'est une
-/// consultation ponctuelle, accessible en push depuis l'Accueil (voir
-/// `DashboardPage`) plutôt que de consommer un 6e onglet.
+/// 5 onglets (section 7.1 du README) : Accueil (UC2), Soins — catalogue,
+/// souscription, paiements (UC3), Dossier — dossier médical complet :
+/// antécédents, traitements, rapports journaliers, documents, calendrier
+/// RDV, évolution IA, notation de l'AVS (UC5/UC6/UC7), Messages — deux fils
+/// Administration/AVS (UC8), Profil — compte, famille, sécurité (UC12). Le
+/// bouton SOS (UC4) — l'action la plus critique de l'app — n'est
+/// volontairement PAS un onglet : c'est un bouton flottant permanent
+/// (`FloatingActionButton.extended`, `centerFloat`), toujours visible et
+/// atteignable en un geste quel que soit l'onglet actif, plutôt que de
+/// partager l'attention avec le reste de la navigation.
 class PatientShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
@@ -26,8 +26,8 @@ class PatientShell extends StatelessWidget {
   static const _destinations = [
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Accueil'),
     _NavItem(icon: Icons.medical_information_outlined, selectedIcon: Icons.medical_information, label: 'Soins'),
-    _NavItem(icon: Icons.calendar_month_outlined, selectedIcon: Icons.calendar_month, label: 'Rendez-vous'),
-    _NavItem(icon: Icons.chat_bubble_outline, selectedIcon: Icons.chat_bubble, label: 'Messagerie'),
+    _NavItem(icon: Icons.folder_shared_outlined, selectedIcon: Icons.folder_shared, label: 'Dossier'),
+    _NavItem(icon: Icons.chat_bubble_outline, selectedIcon: Icons.chat_bubble, label: 'Messages'),
     _NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profil'),
   ];
 
