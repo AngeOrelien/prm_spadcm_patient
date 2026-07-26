@@ -57,24 +57,6 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> deconnecter() => _storage.clear();
 
   @override
-  Future<Patient> connexionTest({
-    required String email,
-    required String motDePasse,
-  }) async {
-    final data = await _remoteDataSource.loginTest(
-      email: email.trim().toLowerCase(),
-      motDePasse: motDePasse,
-    );
-
-    await _storage.saveTokens(
-      accessToken: data['accessToken'] as String,
-      refreshToken: data['refreshToken'] as String,
-    );
-
-    return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
-  }
-
-  @override
   Future<void> inscrire({
     required String nom,
     required String prenom,
@@ -92,7 +74,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Patient> verifierInscriptionOtp({
+  Future<Patient> verifierInscription({
     required String email,
     required String code,
   }) async {
@@ -106,20 +88,29 @@ class AuthRepositoryImpl implements AuthRepository {
       refreshToken: data['refreshToken'] as String,
     );
 
-    // Selon les versions du backend, `verify-otp` peut ou non renvoyer le
-    // profil complet dans la même réponse que les tokens (voir §1.2 du
-    // TESTING-README, moins détaillé que pour `verify-login-otp`) — on
-    // retombe sur `GET /auth/me` si `utilisateur` est absent, plutôt que de
-    // planter sur un cast raté.
-    final utilisateurJson = data['utilisateur'] as Map<String, dynamic>?;
-    if (utilisateurJson != null) {
-      return PatientModel.fromJson(utilisateurJson);
-    }
-    return _remoteDataSource.obtenirProfil();
+    return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> renvoyerOtpInscription({required String email}) {
     return _remoteDataSource.renvoyerOtpInscription(email: email.trim().toLowerCase());
+  }
+
+  @override
+  Future<Patient> connexionTest({
+    required String email,
+    required String motDePasse,
+  }) async {
+    final data = await _remoteDataSource.loginTest(
+      email: email.trim().toLowerCase(),
+      motDePasse: motDePasse,
+    );
+
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+
+    return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
   }
 }

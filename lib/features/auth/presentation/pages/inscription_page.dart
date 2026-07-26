@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -12,11 +13,14 @@ import '../../../../shared/widgets/misc/app_circle_icon_button.dart';
 import '../providers/auth_providers.dart';
 import 'inscription_otp_page.dart';
 
-/// Écran d'inscription libre (vitrine publique, README frontend §5) :
-/// nom, prénom, email, téléphone, mot de passe -> `POST /auth/register`,
-/// puis code OTP de confirmation sur [InscriptionOtpPage].
+/// Formulaire d'inscription libre (README section 5) : nom, prénom, email,
+/// téléphone, mot de passe + confirmation. Garde en mémoire le `soinId`
+/// visé (si on vient d'un tap "Souscrire" sur `/soins-public/:id`) pour
+/// revenir directement au formulaire de souscription une fois connecté.
 class InscriptionPage extends ConsumerStatefulWidget {
-  const InscriptionPage({super.key});
+  final String? soinId;
+
+  const InscriptionPage({super.key, this.soinId});
 
   @override
   ConsumerState<InscriptionPage> createState() => _InscriptionPageState();
@@ -28,8 +32,8 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
   final _prenomController = TextEditingController();
   final _emailController = TextEditingController();
   final _telephoneController = TextEditingController();
-  final _motDePasseController = TextEditingController();
-  final _confirmationController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
@@ -37,14 +41,21 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
     _prenomController.dispose();
     _emailController.dispose();
     _telephoneController.dispose();
-    _motDePasseController.dispose();
-    _confirmationController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  String? _validerConfirmation(String? value) {
-    if (value != _motDePasseController.text) {
+  String? _confirmationMotDePasse(String? value) {
+    if (value != _passwordController.text) {
       return 'Les mots de passe ne correspondent pas';
+    }
+    return null;
+  }
+
+  String? _telephoneValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Le téléphone est requis';
     }
     return null;
   }
@@ -56,20 +67,20 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
     final succes = await controller.inscrire(
       nom: _nomController.text,
       prenom: _prenomController.text,
-      email: _emailController.text.trim(),
+      email: _emailController.text,
       telephone: _telephoneController.text,
-      motDePasse: _motDePasseController.text,
+      motDePasse: _passwordController.text,
     );
 
     if (!mounted) return;
 
     if (succes) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const InscriptionOtpPage()),
+        MaterialPageRoute(builder: (_) => InscriptionOtpPage(soinId: widget.soinId)),
       );
     } else {
       final erreur = ref.read(inscriptionControllerProvider).errorMessage;
-      context.showError(erreur ?? "L'inscription a échoué, réessayez.");
+      context.showError(erreur ?? "Impossible de créer le compte, réessaie.");
     }
   }
 
@@ -101,7 +112,7 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  'Créez votre compte patient pour souscrire à un service de suivi SPAD Cameroun',
+                  'Créez votre compte pour souscrire à un forfait SPAD Cameroun',
                   style: textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -112,9 +123,8 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 AppTextField(
                   controller: _nomController,
                   hint: 'Votre nom',
-                  validator: (v) => Validators.requis(v, champ: 'Le nom'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Le nom est requis' : null,
                   textInputAction: TextInputAction.next,
-                  autofocus: true,
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -123,7 +133,7 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 AppTextField(
                   controller: _prenomController,
                   hint: 'Votre prénom',
-                  validator: (v) => Validators.requis(v, champ: 'Le prénom'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Le prénom est requis' : null,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -135,7 +145,7 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                   hint: 'exemple@email.com',
                   keyboardType: TextInputType.emailAddress,
                   validator: Validators.email,
-                  prefixIcon: Icons.mail_outline,
+                  prefixIcon: Icons.email_outlined,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -144,9 +154,9 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 const SizedBox(height: AppSpacing.sm),
                 AppTextField(
                   controller: _telephoneController,
-                  hint: '+237 6XX XXX XXX',
+                  hint: '6XX XXX XXX',
                   keyboardType: TextInputType.phone,
-                  validator: Validators.telephone,
+                  validator: _telephoneValidator,
                   prefixIcon: Icons.phone_outlined,
                   textInputAction: TextInputAction.next,
                 ),
@@ -155,8 +165,8 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 Text('Mot de passe', style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: AppSpacing.sm),
                 AppPasswordField(
-                  controller: _motDePasseController,
-                  hint: 'Au moins 8 caractères',
+                  controller: _passwordController,
+                  hint: 'Créez un mot de passe',
                   validator: Validators.password,
                   textInputAction: TextInputAction.next,
                 ),
@@ -165,12 +175,12 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
                 Text('Confirmer le mot de passe', style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: AppSpacing.sm),
                 AppPasswordField(
-                  controller: _confirmationController,
-                  hint: 'Retapez votre mot de passe',
-                  validator: _validerConfirmation,
+                  controller: _confirmPasswordController,
+                  hint: 'Ressaisissez le mot de passe',
+                  validator: _confirmationMotDePasse,
                   textInputAction: TextInputAction.done,
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.lg),
 
                 AppPrimaryButton(
                   label: 'Créer mon compte',
@@ -181,25 +191,17 @@ class _InscriptionPageState extends ConsumerState<InscriptionPage> {
 
                 Center(
                   child: TextButton(
-                    onPressed: isLoading ? null : () => Navigator.of(context).maybePop(),
-                    child: const Text.rich(
-                      TextSpan(
-                        text: 'Déjà un compte ? ',
-                        children: [
-                          TextSpan(
-                            text: 'Se connecter',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    ),
+                    onPressed: () => context.go('/login'),
+                    child: const Text('J\'ai déjà un compte ? Se connecter'),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.lg),
               ],
             ),
           ),
         ),
       ),
+      backgroundColor: AppColors.background,
     );
   }
 }

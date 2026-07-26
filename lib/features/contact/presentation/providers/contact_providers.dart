@@ -7,9 +7,9 @@ final contactRemoteDataSourceProvider = Provider<ContactRemoteDataSource>((ref) 
   return ContactRemoteDataSource(ref.watch(apiClientProvider));
 });
 
-/// Contrôleur d'envoi du formulaire de contact public (état
-/// loading/succès/erreur, y compris le cas `429` anti-spam — voir
-/// `ApiException.isRateLimited`).
+/// Contrôleur d'envoi du formulaire de contact public (README section 4),
+/// sur le modèle de `SouscriptionController` : un simple état
+/// loading/succès/erreur, sans donnée persistante à exposer.
 class ContactController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}

@@ -5,27 +5,33 @@ import '../../../../core/theme/app_dimens.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../domain/entities/soins_entities.dart';
 
-String prixFormatte(int prix) =>
+String prixFormate(int prix) =>
     '${prix.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
 
-/// Carte de présentation d'un [SoinCatalogue], utilisée à la fois sur la
-/// vitrine publique (`/vitrine`) et sur l'onglet Soins authentifié
-/// (`/soins`) — un seul style de carte pour les deux contextes (README
-/// frontend §3 et §8). Le tap sur la carte entière pousse vers l'écran de
-/// détail ; `trailingAction` permet à l'onglet authentifié d'ajouter un
-/// bouton "Souscrire"/"Souscrit" en plus du tap.
+/// Carte de soin factorisée, utilisée à la fois par la vitrine publique
+/// (`/vitrine`) et par l'onglet Soins authentifié (`soins_page.dart`), pour
+/// ne pas dupliquer le style entre les deux écrans (README section 3).
+///
+/// - [onTap] : tap sur la carte entière, pousse vers l'écran de détail
+///   (public ou privé selon le contexte appelant).
+/// - [estActif] : le patient est déjà souscrit à ce soin précis (affiche le
+///   badge "Votre forfait").
+/// - [footer] : zone d'action optionnelle en bas de carte (bouton
+///   "Souscrire"/"Souscrit" côté onglet Soins authentifié). `null` sur la
+///   vitrine, où le tap sur la carte suffit — pas de bouton d'action actif
+///   avant connexion.
 class SoinCard extends StatelessWidget {
   final SoinCatalogue soin;
   final bool estActif;
   final VoidCallback? onTap;
-  final Widget? trailingAction;
+  final Widget? footer;
 
   const SoinCard({
     super.key,
     required this.soin,
     this.estActif = false,
     this.onTap,
-    this.trailingAction,
+    this.footer,
   });
 
   @override
@@ -46,7 +52,7 @@ class SoinCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (soin.imageCouverture != null && soin.imageCouverture!.isNotEmpty)
+              if (soin.imageCouverture != null)
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.network(
@@ -55,19 +61,11 @@ class SoinCard extends StatelessWidget {
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: AppColors.surfaceMuted,
                       alignment: Alignment.center,
-                      child: const Icon(Icons.medical_information_outlined, color: AppColors.textDisabled, size: 32),
+                      child: const Icon(Icons.medical_information_outlined, color: AppColors.textDisabled, size: 36),
                     ),
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
-                      return Container(
-                        color: AppColors.surfaceMuted,
-                        alignment: Alignment.center,
-                        child: const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      );
+                      return Container(color: AppColors.surfaceMuted, height: double.infinity);
                     },
                   ),
                 ),
@@ -87,32 +85,43 @@ class SoinCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       soin.description,
+                      style: Theme.of(context).textTheme.bodySmall,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
                         const Icon(Icons.event_repeat_outlined, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(soin.frequenceVisites, style: Theme.of(context).textTheme.bodySmall),
-                        ),
+                        Text(soin.frequenceVisites, style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
+                    if (soin.prestationsIncluses.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final prestation in soin.prestationsIncluses)
+                            Chip(
+                              label: Text(prestation, style: const TextStyle(fontSize: 11)),
+                              backgroundColor: AppColors.surfaceMuted,
+                              visualDensity: VisualDensity.compact,
+                              side: BorderSide.none,
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [
                         Text(
-                          '${prixFormatte(soin.prix)} / mois',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontSize: 16, color: AppColors.primaryDark),
+                          '${prixFormate(soin.prix)} / mois',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16, color: AppColors.primaryDark),
                         ),
                         const Spacer(),
-                        if (trailingAction != null) trailingAction!,
+                        if (footer != null) footer!,
                       ],
                     ),
                   ],

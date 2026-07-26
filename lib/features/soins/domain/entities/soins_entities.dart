@@ -9,15 +9,15 @@ class SoinCatalogue {
   final String frequenceVisites;
   final List<String> prestationsIncluses;
 
-  /// Image de couverture affichée sur la carte du catalogue (vitrine +
-  /// onglet Soins). URL absolue déjà renvoyée telle quelle par le backend
-  /// (`POST /soins/:id/media`), rien à reconstruire côté app.
+  /// URL absolue de l'image de couverture (ex:
+  /// `http://localhost:4000/uploads/soins/<id>/....jpg`), renvoyée telle
+  /// quelle par le backend. `null` si le soin n'a pas encore de média.
   final String? imageCouverture;
 
-  /// Images supplémentaires affichées sur l'écran de détail (galerie).
+  /// Galerie d'images complémentaires (URLs absolues), vide si aucune.
   final List<String> images;
 
-  /// Courtes vidéos illustrant le soin (écran de détail).
+  /// Courtes vidéos illustrant le soin (URLs absolues), vide si aucune.
   final List<String> videos;
 
   const SoinCatalogue({
@@ -33,54 +33,50 @@ class SoinCatalogue {
   });
 }
 
-enum StatutSouscription { active, expiree, annulee, resiliee, enAttentePaiement }
-
-StatutSouscription statutSouscriptionFromString(String? value) {
-  switch (value) {
-    case 'expiree':
-      return StatutSouscription.expiree;
-    case 'annulee':
-      return StatutSouscription.annulee;
-    case 'resiliee':
-      return StatutSouscription.resiliee;
-    case 'en_attente_paiement':
-      return StatutSouscription.enAttentePaiement;
-    case 'active':
-    default:
-      return StatutSouscription.active;
-  }
-}
-
-/// Infos santé/allergies/régime saisies au moment de souscrire (README
-/// frontend §7.1) — transmises directement dans `POST /souscriptions` via
-/// `patientInfo`, sans passer par un dossier `Patient` pré-créé : c'est le
-/// backend qui crée ce dossier automatiquement à la confirmation du
-/// paiement.
+/// Informations médicales saisies au moment de la souscription (README
+/// section 0 : plus de dossier `Patient` séparé à créer avant paiement, ce
+/// formulaire remplace l'ancien écran "compléter mon dossier").
 class PatientInfoSouscription {
-  final String? nom;
-  final String? prenom;
   final List<String> allergies;
   final String? informationsSante;
   final String? regimeAlimentaire;
+  final String? nom;
+  final String? prenom;
 
   const PatientInfoSouscription({
-    this.nom,
-    this.prenom,
     this.allergies = const [],
     this.informationsSante,
     this.regimeAlimentaire,
+    this.nom,
+    this.prenom,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      if (nom != null && nom!.trim().isNotEmpty) 'nom': nom!.trim(),
-      if (prenom != null && prenom!.trim().isNotEmpty) 'prenom': prenom!.trim(),
       if (allergies.isNotEmpty) 'allergies': allergies,
       if (informationsSante != null && informationsSante!.trim().isNotEmpty)
         'informationsSante': informationsSante!.trim(),
       if (regimeAlimentaire != null && regimeAlimentaire!.trim().isNotEmpty)
         'regimeAlimentaire': regimeAlimentaire!.trim(),
+      if (nom != null && nom!.trim().isNotEmpty) 'nom': nom!.trim(),
+      if (prenom != null && prenom!.trim().isNotEmpty) 'prenom': prenom!.trim(),
     };
+  }
+}
+
+enum StatutSouscription { active, enAttentePaiement, expiree, annulee }
+
+StatutSouscription statutSouscriptionFromString(String? value) {
+  switch (value) {
+    case 'en_attente_paiement':
+      return StatutSouscription.enAttentePaiement;
+    case 'expiree':
+      return StatutSouscription.expiree;
+    case 'annulee':
+      return StatutSouscription.annulee;
+    case 'active':
+    default:
+      return StatutSouscription.active;
   }
 }
 
@@ -102,12 +98,6 @@ class Souscription {
     this.dateFin,
     required this.statut,
   });
-
-  /// Une souscription "bloque" une nouvelle souscription tant qu'elle n'est
-  /// ni expirée, ni annulée, ni résiliée — même règle d'exclusivité que
-  /// `STATUTS_BLOQUANTS` côté backend (`controllers/souscriptionController.js`).
-  bool get estBloquante =>
-      statut == StatutSouscription.active || statut == StatutSouscription.enAttentePaiement;
 }
 
 enum StatutPaiement { reussi, echoue, enAttente }

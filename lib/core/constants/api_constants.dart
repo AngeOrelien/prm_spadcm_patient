@@ -27,12 +27,6 @@ class ApiConstants {
   static const String refreshToken = '/auth/refresh-token';
   static const String me = '/auth/me';
 
-  // --- Auth : inscription libre (vitrine publique) — section 5 du README
-  // frontend, distincte de la connexion OTP ci-dessus. ---
-  static const String register = '/auth/register';
-  static const String verifyRegisterOtp = '/auth/verify-otp';
-  static const String resendRegisterOtp = '/auth/resend-otp';
-
   // --- Tableau de bord santé (UC2) : agrégat servi en un seul appel par
   // GET /api/patients/moi/dashboard, voir `DashboardRemoteDataSource`. ---
   static const String monDossier = '/patients/moi';
@@ -46,21 +40,41 @@ class ApiConstants {
 
   // --- Soins : catalogue, souscription, paiements (README section 3.1 /
   // routes/soinRoutes.js + souscriptionRoutes.js). ---
-  // `GET /soins` et `GET /soins/:id` sont publics (pas de token requis) —
-  // c'est ce qui permet à la vitrine non connectée de les appeler tel quel.
   static const String catalogueSoins = '/soins';
   static const String souscriptions = '/souscriptions';
   static const String mesSouscriptions = '/souscriptions/moi';
-  static const String paiements = '/paiements';
   static const String mesPaiements = '/paiements/moi';
 
-  static String soin(String id) => '/soins/$id';
-  static String souscriptionTerminer(String id) => '/souscriptions/$id/terminer';
-  static String souscriptionAnnuler(String id) => '/souscriptions/$id/annuler';
-  static String paiementSimuler(String id) => '/paiements/$id/simuler';
+  /// `POST /paiements` — création d'un paiement pour une souscription.
+  /// Distincte de [mesPaiements] (`/paiements/moi`), utilisée en lecture
+  /// seule pour l'historique.
+  static const String paiements = '/paiements';
 
-  // --- Contact public (vitrine, sans compte) ---
+  /// `PATCH /souscriptions/:id/terminer` — met fin à une souscription
+  /// `active`, seul moyen d'en reprendre une nouvelle (une seule active à
+  /// la fois par patient, cf. README section 0).
+  static String souscriptionTerminer(String souscriptionId) =>
+      '/souscriptions/$souscriptionId/terminer';
+
+  /// `PATCH /souscriptions/:id/annuler` — annule une souscription encore
+  /// `en_attente_paiement` (pas encore payée). Ne pas confondre avec
+  /// [souscriptionTerminer], réservé aux souscriptions `active`.
+  static String souscriptionAnnuler(String souscriptionId) =>
+      '/souscriptions/$souscriptionId/annuler';
+
+  /// `POST /paiements/:id/simuler` — confirmation immédiate d'un paiement
+  /// en environnement local/dev uniquement (`EnvConfig.isVercel == false`).
+  /// Renvoie 403 en production, où c'est le webhook réel qui confirme.
+  static String paiementSimuler(String paiementId) =>
+      '/paiements/$paiementId/simuler';
+
+  // --- Vitrine publique : contact ---
   static const String contact = '/contact';
+
+  // --- Inscription libre (compte patient/famille) ---
+  static const String register = '/auth/register';
+  static const String verifyRegisterOtp = '/auth/verify-otp';
+  static const String resendRegisterOtp = '/auth/resend-otp';
 
   // --- Dossier médical : traitements, rapports, documents, rendez-vous ---
   static const String mesTraitements = '/traitements';

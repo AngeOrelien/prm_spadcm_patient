@@ -22,14 +22,8 @@ abstract class AuthRepository {
 
   Future<void> deconnecter();
 
-  /// ⚠️ TEST — connexion en un seul appel, sans étape OTP.
-  Future<Patient> connexionTest({
-    required String email,
-    required String motDePasse,
-  });
-
-  /// Étape 1 de l'inscription libre (vitrine) : crée le compte `patient` et
-  /// déclenche l'envoi d'un code OTP par email.
+  /// Étape 1 de l'inscription libre : crée le compte, le backend envoie un
+  /// code OTP par email pour la vérifier.
   Future<void> inscrire({
     required String nom,
     required String prenom,
@@ -38,12 +32,18 @@ abstract class AuthRepository {
     required String motDePasse,
   });
 
-  /// Étape 2 : vérifie le code reçu, sauvegarde les tokens et renvoie le
-  /// profil du compte tout juste créé.
-  Future<Patient> verifierInscriptionOtp({
+  /// Étape 2 de l'inscription : vérifie le code reçu par email, sauvegarde
+  /// les tokens et renvoie le profil désormais connecté.
+  Future<Patient> verifierInscription({
     required String email,
     required String code,
   });
 
   Future<void> renvoyerOtpInscription({required String email});
+
+  /// ⚠️ TEST — connexion en un seul appel, sans étape OTP.
+  Future<Patient> connexionTest({
+    required String email,
+    required String motDePasse,
+  });
 }

@@ -23,12 +23,10 @@ class SouscriptionModel {
   static Souscription fromJson(Map<String, dynamic> json) {
     final soin = json['soinId'];
     final soinMap = soin is Map ? soin : const {};
-    // `soinId` peut être un id brut (String) si le backend ne l'a pas
-    // "populate", ou l'objet soin complet une fois peuplé — on gère les deux.
-    final soinIdValeur = soin is Map ? (soin['_id'] ?? soin['id']) : soin;
+    final soinIdBrut = soinMap is Map ? (soinMap['_id'] ?? soinMap['id']) : soin;
     return Souscription(
       id: (json['_id'] ?? json['id']).toString(),
-      soinId: soinIdValeur?.toString(),
+      soinId: soinIdBrut?.toString(),
       soinNom: soinMap['nom'] as String? ?? 'Soin SPAD Cameroun',
       soinPrix: (soinMap['prix'] as num?)?.toInt() ?? 0,
       dateDebut: _dateOrNow(json['dateDebut']),

@@ -15,7 +15,6 @@ import '../features/profil/presentation/pages/profil_page.dart';
 import '../features/soins/presentation/pages/soin_detail_page.dart';
 import '../features/soins/presentation/pages/soins_page.dart';
 import '../features/soins/presentation/pages/souscription_infos_page.dart';
-import '../features/soins/presentation/providers/soins_providers.dart';
 import '../features/vitrine/presentation/pages/vitrine_page.dart';
 import '../screens/splash_screen.dart';
 import '../shared/widgets/navigation/patient_shell.dart';
@@ -31,19 +30,24 @@ class _GoRouterRefreshNotifier extends ChangeNotifier {
   }
 }
 
+/// Routes accessibles sans être connecté (README section 2). Toute route
+/// hors de cette liste redirige un visiteur non connecté vers `/vitrine`
+/// (nouveau point d'atterrissage par défaut, à la place de `/login`).
+///
+/// `/inscription/otp` n'apparaît pas ici : comme `otp_verification_page`
+/// pour la connexion, cet écran est poussé via `Navigator.push` directement
+/// depuis `/inscription`, pas via go_router — il ne devient donc jamais
+/// `state.matchedLocation`.
+bool _estRoutePublique(String location) {
+  if (location == '/vitrine' || location == '/login' || location == '/inscription') {
+    return true;
+  }
+  if (location.startsWith('/soins-public/')) return true;
+  return false;
+}
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
-
-/// Chemins accessibles sans être connecté (README frontend §2). Toute autre
-/// route redirige vers `/vitrine` si l'utilisateur n'est pas connecté —
-/// c'est ce nouvel accueil public qui remplace `/login` comme point
-/// d'atterrissage par défaut.
-bool _estRoutePublique(String matchedLocation) {
-  const prefixesPublics = ['/vitrine', '/soins-public', '/login', '/inscription'];
-  return prefixesPublics.any(
-    (prefixe) => matchedLocation == prefixe || matchedLocation.startsWith('$prefixe/'),
-  );
-}
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = _GoRouterRefreshNotifier(ref);
@@ -58,28 +62,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final estEnChargement = authState.isLoading;
       final estConnecte = authState.value != null;
 
-      final matchedLocation = state.matchedLocation;
-      final surSplash = matchedLocation == '/';
-      // `/login` et `/inscription` sont les deux écrans "point d'entrée" de
-      // connexion : une fois connecté depuis l'un ou l'autre, même logique
-      // de redirection (accueil, ou souscription en attente ci-dessous).
-      final surEcranConnexion = matchedLocation == '/login' || matchedLocation == '/inscription';
+      final location = state.matchedLocation;
+      final surSplash = location == '/';
+      final surRoutePublique = _estRoutePublique(location);
 
       if (estEnChargement) return surSplash ? null : '/';
-
-      if (!estConnecte) {
-        return _estRoutePublique(matchedLocation) ? null : '/vitrine';
-      }
-
-      if (estConnecte && (surEcranConnexion || surSplash)) {
-        // Un visiteur non connecté qui voulait souscrire à un soin est
-        // envoyé ici juste après confirmation de connexion/inscription,
-        // plutôt que vers l'accueil générique (README frontend §5/§7.2).
-        final soinIdEnAttente = ref.read(pendingSoinIdProvider);
-        if (soinIdEnAttente != null) {
-          ref.read(pendingSoinIdProvider.notifier).state = null;
-          return '/souscrire/$soinIdEnAttente';
-        }
+      if (!estConnecte) return surRoutePublique ? null : '/vitrine';
+      // Connecté : les écrans "pré-connexion" ne doivent plus s'afficher.
+      if (estConnecte && (surSplash || location == '/login' || location == '/vitrine' || location == '/inscription')) {
         return '/accueil';
       }
       return null;
@@ -87,12 +77,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginEmailPage()),
-      GoRoute(path: '/inscription', builder: (context, state) => const InscriptionPage()),
 
-      // --- Vitrine publique (README frontend §3) ---
-      // Accueil des visiteurs non connectés : présentation SPAD, images,
-      // vidéos, catalogue de services, contact. Aucune bottom navigation ici
-      // (page défilante simple), d'où le rattachement au navigateur racine.
+      // --- Vitrine publique et parcours d'inscription/souscription non
+      // connecté (README section 1 et 2) : en dehors du
+      // StatefulShellRoute, pas de bottom navigation pour un visiteur non
+      // connecté. ---
       GoRoute(
         path: '/vitrine',
         parentNavigatorKey: _rootNavigatorKey,
@@ -101,7 +90,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/soins-public/:id',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => SoinDetailPage(soinId: state.pathParameters['id']!),
+        builder: (context, state) => SoinDetailPage(
+          soinId: state.pathParameters['id']!,
+          estContextePublic: true,
+        ),
+      ),
+      GoRoute(
+        path: '/inscription',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          final soinId = extra is Map ? extra['soinId'] as String? : null;
+          return InscriptionPage(soinId: soinId);
+        },
       ),
 
       // --- Écrans plein écran hors bottom navigation ---
@@ -119,20 +120,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DocumentsPage(),
       ),
 
-      // Formulaire patientInfo + paiement (README frontend §7). Réservé aux
-      // utilisateurs connectés : un accès direct sans connexion est
-      // renvoyé vers `/vitrine` par le `redirect` ci-dessus.
+      // --- Détail d'un soin authentifié + formulaire de souscription ---
+      // Poussés au-dessus du shell (README section 6.2/7.1) : ce sont des
+      // écrans de consultation/action ponctuels, pas des onglets.
+      // `souscrire/:id` déclaré avant `:id` pour être prioritaire sur ce
+      // segment statique.
       GoRoute(
-        path: '/souscrire/:soinId',
+        path: '/soins/souscrire/:id',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => SouscriptionInfosPage(soinId: state.pathParameters['soinId']!),
+        builder: (context, state) => SouscriptionInfosPage(soinId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/soins/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SoinDetailPage(
+          soinId: state.pathParameters['id']!,
+          estContextePublic: false,
+        ),
       ),
 
       // --- Bottom navigation persistante du patient (5 onglets, README 7.1) ---
       // Accueil / Soins / Dossier / Messages / Profil. Chaque branche garde
       // sa propre pile de navigation (utile pour les écrans de détail
-      // poussés depuis une liste, ex: le chat depuis Messages, ou le détail
-      // d'un soin depuis l'onglet Soins).
+      // poussés depuis une liste, ex: le chat depuis Messages).
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return PatientShell(navigationShell: navigationShell);
@@ -146,16 +156,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/soins',
-                builder: (context, state) => const SoinsPage(),
-                routes: [
-                  GoRoute(
-                    path: ':id',
-                    builder: (context, state) => SoinDetailPage(soinId: state.pathParameters['id']!),
-                  ),
-                ],
-              ),
+              GoRoute(path: '/soins', builder: (context, state) => const SoinsPage()),
             ],
           ),
           StatefulShellBranch(

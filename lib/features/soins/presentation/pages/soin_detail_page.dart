@@ -1,298 +1,355 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
-import '../../../../shared/widgets/buttons/app_primary_button.dart';
-import '../../../../shared/widgets/media/app_video_player.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/entities/soins_entities.dart';
 import '../providers/soins_providers.dart';
 import '../widgets/soin_card.dart';
 
-/// Écran de détail d'un soin — utilisé aussi bien depuis la vitrine publique
-/// (`/soins-public/:id`, visiteur non connecté) que depuis l'onglet Soins
-/// authentifié (`/soins/:id`). Le contenu (image, galerie, vidéos,
-/// description) est identique ; seul le bouton du bas change de
-/// comportement selon l'état de connexion et de souscription (README
-/// frontend §6.2).
+/// Détail d'un soin, réutilisé dans deux contextes (README section 6.2) :
+/// - public, poussé depuis `/soins-public/:id` (vitrine, non connecté) ;
+/// - privé, poussé depuis `/soins/:id` (onglet Soins authentifié).
+///
+/// [estContextePublic] ne change que le comportement du bouton du bas —
+/// tout le reste du rendu (image, galerie, vidéos, description) est
+/// identique dans les deux contextes.
 class SoinDetailPage extends ConsumerWidget {
   final String soinId;
+  final bool estContextePublic;
 
-  const SoinDetailPage({super.key, required this.soinId});
+  const SoinDetailPage({super.key, required this.soinId, this.estContextePublic = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final catalogueAsync = ref.watch(catalogueSoinsProvider);
-    // Le catalogue est déjà chargé la plupart du temps (on vient d'une
-    // liste) : on cherche d'abord dedans pour éviter un aller-retour réseau
-    // supplémentaire, et on retombe sur `GET /soins/:id` sinon (lien direct).
-    final soinDansCatalogue = catalogueAsync.maybeWhen(
-      data: (soins) {
-        for (final s in soins) {
-          if (s.id == soinId) return s;
-        }
-        return null;
-      },
-      orElse: () => null,
-    );
+    final soinAsync = ref.watch(soinProvider(soinId));
 
-    if (soinDansCatalogue != null) {
-      return _SoinDetailContenu(soin: soinDansCatalogue);
-    }
-
-    final soinAsync = ref.watch(soinDetailProvider(soinId));
     return Scaffold(
-      appBar: AppBar(title: const Text('Détail du service')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Détail du soin')),
       body: soinAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(e is AppException ? e.message : 'Impossible de charger ce service.'),
+            child: Text(e is AppException ? e.message : 'Impossible de charger ce soin.'),
           ),
         ),
-        data: (soin) => _SoinDetailContenu(soin: soin),
+        data: (soin) => _SoinDetailContent(soin: soin, estContextePublic: estContextePublic),
       ),
     );
   }
 }
 
-class _SoinDetailContenu extends ConsumerWidget {
+class _SoinDetailContent extends ConsumerWidget {
   final SoinCatalogue soin;
+  final bool estContextePublic;
 
-  const _SoinDetailContenu({required this.soin});
+  const _SoinDetailContent({required this.soin, required this.estContextePublic});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estConnecte = ref.watch(authControllerProvider).value != null;
-    final souscriptionsAsync = ref.watch(souscriptionsProvider);
-    final souscriptions = souscriptionsAsync.maybeWhen(data: (d) => d, orElse: () => const <Souscription>[]);
+    final authState = ref.watch(authControllerProvider);
+    final estConnecte = authState.value != null;
 
-    final souscriptionBloquante = souscriptions.where((s) => s.estBloquante).toList();
-    final estDejaSouscritIci = souscriptionBloquante.any((s) => s.soinId == soin.id);
-    final souscritAilleurs = souscriptionBloquante.isNotEmpty && !estDejaSouscritIci;
+    final souscriptions = ref
+        .watch(souscriptionsProvider)
+        .maybeWhen(data: (d) => d, orElse: () => const <Souscription>[]);
+    final souscriptionEnCours = souscriptions.isEmpty ? null : souscriptions.first;
+    final estDejaSouscritACeSoin = souscriptionEnCours?.soinId == soin.id;
+    final aUneAutreSouscription = souscriptionEnCours != null && !estDejaSouscritACeSoin;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(soin.nom)),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-        children: [
-          if (soin.imageCouverture != null && soin.imageCouverture!.isNotEmpty)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                soin.imageCouverture!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: AppColors.surfaceMuted,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.medical_information_outlined, size: 48, color: AppColors.textDisabled),
-                ),
-              ),
-            ),
-
-          if (soin.images.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              height: 100,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                scrollDirection: Axis.horizontal,
-                itemCount: soin.images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-                itemBuilder: (context, index) => ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+            children: [
+              if (soin.imageCouverture != null)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
                   child: Image.network(
-                    soin.images[index],
-                    width: 140,
-                    height: 100,
+                    soin.imageCouverture!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
-                      width: 140,
                       color: AppColors.surfaceMuted,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.medical_information_outlined, size: 48, color: AppColors.textDisabled),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
-
-          if (soin.videos.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text('Vidéos', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16)),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            for (final video in soin.videos)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 4),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  child: AppVideoPlayer(url: video),
-                ),
-              ),
-          ],
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${prixFormatte(soin.prix)} / mois',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primaryDark),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    const Icon(Icons.event_repeat_outlined, size: 18, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Text(soin.frequenceVisites, style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(soin.description, style: Theme.of(context).textTheme.bodyMedium),
-                if (soin.prestationsIncluses.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Prestations incluses',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 15),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final prestation in soin.prestationsIncluses)
-                        Chip(
-                          label: Text(prestation, style: const TextStyle(fontSize: 12)),
-                          backgroundColor: AppColors.surfaceMuted,
-                          side: BorderSide.none,
+              if (soin.images.length > 1)
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: soin.images.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                    itemBuilder: (context, index) => ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: Image.network(
+                        soin.images[index],
+                        width: 140,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 140,
+                          color: AppColors.surfaceMuted,
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (soin.videos.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Vidéo de présentation', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 15)),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (final video in soin.videos) _InlineVideoPlayer(url: video),
                     ],
                   ),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-
-                if (estDejaSouscritIci)
-                  const _MessageEtatSouscription(
-                    icon: Icons.check_circle_outline,
-                    couleur: AppColors.success,
-                    message: 'Vous êtes déjà souscrit à ce service.',
-                  )
-                else if (souscritAilleurs)
-                  _SouscritAilleursSection(souscription: souscriptionBloquante.first)
-                else
-                  AppPrimaryButton(
-                    label: estConnecte ? 'Souscrire' : 'Se connecter pour souscrire',
-                    onPressed: () => _souscrire(context, ref, estConnecte),
-                  ),
-              ],
+                ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(soin.nom, style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(soin.description, style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        const Icon(Icons.event_repeat_outlined, size: 18, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text(soin.frequenceVisites, style: Theme.of(context).textTheme.bodyMedium),
+                      ],
+                    ),
+                    if (soin.prestationsIncluses.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text('Prestations incluses', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 15)),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final prestation in soin.prestationsIncluses)
+                            Chip(label: Text(prestation), backgroundColor: AppColors.surfaceMuted, side: BorderSide.none),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      '${prixFormate(soin.prix)} / mois',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primaryDark),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
+            child: _BoutonAction(
+              soin: soin,
+              estConnecte: estConnecte,
+              estDejaSouscritACeSoin: estDejaSouscritACeSoin,
+              aUneAutreSouscription: aUneAutreSouscription,
+              souscriptionEnCours: souscriptionEnCours,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _souscrire(BuildContext context, WidgetRef ref, bool estConnecte) {
-    if (!estConnecte) {
-      // Mémorise le soin visé pour y revenir directement une fois
-      // l'inscription/connexion terminée (voir `pendingSoinIdProvider` et
-      // la redirection dans `router/app_router.dart`).
-      ref.read(pendingSoinIdProvider.notifier).state = soin.id;
-      context.push('/inscription');
-      return;
-    }
-    context.push('/souscrire/${soin.id}');
-  }
-}
-
-class _MessageEtatSouscription extends StatelessWidget {
-  final IconData icon;
-  final Color couleur;
-  final String message;
-
-  const _MessageEtatSouscription({required this.icon, required this.couleur, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: couleur.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: couleur),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(message, style: Theme.of(context).textTheme.bodyMedium)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SouscritAilleursSection extends ConsumerWidget {
-  final Souscription souscription;
-
-  const _SouscritAilleursSection({required this.souscription});
-
-  Future<void> _terminer(BuildContext context, WidgetRef ref) async {
-    final confirme = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Mettre fin à votre souscription'),
-        content: Text(
-          'Vous êtes actuellement souscrit à "${souscription.soinNom}". '
-          'Y mettre fin vous permettra de souscrire à ce nouveau service. Confirmer ?',
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirmer')),
-        ],
-      ),
+      ],
     );
-    if (confirme != true || !context.mounted) return;
+  }
+}
 
-    final succes = await ref.read(terminerSouscriptionControllerProvider.notifier).terminer(souscription.id);
+class _BoutonAction extends ConsumerWidget {
+  final SoinCatalogue soin;
+  final bool estConnecte;
+  final bool estDejaSouscritACeSoin;
+  final bool aUneAutreSouscription;
+  final Souscription? souscriptionEnCours;
+
+  const _BoutonAction({
+    required this.soin,
+    required this.estConnecte,
+    required this.estDejaSouscritACeSoin,
+    required this.aUneAutreSouscription,
+    required this.souscriptionEnCours,
+  });
+
+  Future<void> _terminerAutreSouscription(BuildContext context, WidgetRef ref) async {
+    if (souscriptionEnCours == null) return;
+    final controller = ref.read(terminerSouscriptionControllerProvider.notifier);
+    final estActive = souscriptionEnCours!.statut == StatutSouscription.active;
+    final succes = estActive
+        ? await controller.terminer(souscriptionEnCours!.id)
+        : await controller.annuler(souscriptionEnCours!.id);
     if (!context.mounted) return;
     if (succes) {
-      context.showInfo('Souscription terminée. Vous pouvez maintenant souscrire à ce service.');
+      context.showInfo('Souscription précédente terminée, vous pouvez souscrire à ce soin.');
     } else {
-      context.showError('Impossible de terminer la souscription, réessayez.');
+      final erreur = ref.read(terminerSouscriptionControllerProvider).asError?.error;
+      context.showError(erreur is AppException ? erreur.message : 'Une erreur est survenue.');
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isLoading = ref.watch(terminerSouscriptionControllerProvider).isLoading;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _MessageEtatSouscription(
-          icon: Icons.info_outline,
-          couleur: AppColors.warning,
-          message:
-              'Vous avez déjà une souscription en cours ("${souscription.soinNom}"). '
-              'Elle doit arriver à expiration ou être terminée avant de souscrire à un autre service.',
+    if (!estConnecte) {
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton(
+          onPressed: () => context.push('/inscription', extra: {'soinId': soin.id}),
+          child: const Text('Souscrire'),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: isLoading ? null : () => _terminer(context, ref),
-          child: isLoading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Mettre fin à ma souscription actuelle'),
+      );
+    }
+
+    if (estDejaSouscritACeSoin) {
+      return const SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton(onPressed: null, child: Text('Déjà souscrit')),
+      );
+    }
+
+    if (aUneAutreSouscription) {
+      final isLoading = ref.watch(terminerSouscriptionControllerProvider).isLoading;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Vous avez déjà une souscription en cours à un autre soin. '
+            'Mettez-y fin avant de souscrire à celui-ci.',
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: isLoading ? null : () => _terminerAutreSouscription(context, ref),
+              child: isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : const Text('Mettre fin à ma souscription en cours'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: FilledButton(
+        onPressed: () => context.push('/soins/souscrire/${soin.id}'),
+        child: const Text('Souscrire'),
+      ),
+    );
+  }
+}
+
+/// Lecteur vidéo minimal (`video_player`) pour les courtes vidéos illustrant
+/// un soin. Supporte à la fois une URL réseau et un asset local
+/// (`assets/videos/...`) pour démarrer sans backend média.
+class _InlineVideoPlayer extends StatefulWidget {
+  final String url;
+
+  const _InlineVideoPlayer({required this.url});
+
+  @override
+  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+}
+
+class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _erreur = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialiser();
+  }
+
+  Future<void> _initialiser() async {
+    try {
+      final controller = widget.url.startsWith('http')
+          ? VideoPlayerController.networkUrl(Uri.parse(widget.url))
+          : VideoPlayerController.asset(widget.url);
+      await controller.initialize();
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+      setState(() => _controller = controller);
+    } catch (_) {
+      if (mounted) setState(() => _erreur = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_erreur) {
+      return Container(
+        height: 180,
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.md)),
+        alignment: Alignment.center,
+        child: const Icon(Icons.videocam_off_outlined, color: AppColors.textDisabled),
+      );
+    }
+    final controller = _controller;
+    if (controller == null) {
+      return Container(
+        height: 180,
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.md)),
+        alignment: Alignment.center,
+        child: const CircularProgressIndicator(),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md)),
+      child: AspectRatio(
+        aspectRatio: controller.value.aspectRatio == 0 ? 16 / 9 : controller.value.aspectRatio,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            VideoPlayer(controller),
+            IconButton(
+              iconSize: 48,
+              color: Colors.white,
+              icon: Icon(controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill),
+              onPressed: () => setState(() {
+                controller.value.isPlaying ? controller.pause() : controller.play();
+              }),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

@@ -40,10 +40,19 @@ class AuthRemoteDataSource {
     }
   }
 
-  /// `POST /auth/register` — inscription libre depuis la vitrine, toujours
-  /// avec `role: patient` (jamais exposé à l'utilisateur, README frontend
-  /// §5). Déclenche l'envoi d'un code OTP par email pour confirmer le
-  /// compte (`verifierInscriptionOtp`).
+  Future<PatientModel> obtenirProfil() async {
+    try {
+      final response = await _apiClient.dio.get(ApiConstants.me);
+      final data = response.data as Map<String, dynamic>;
+      return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
+  /// Inscription libre (compte patient/famille venu de la vitrine
+  /// publique) — `POST /auth/register`, toujours avec `role: 'patient'`
+  /// (jamais exposé à l'utilisateur dans l'UI, cf. README section 5).
   Future<void> inscrire({
     required String nom,
     required String prenom,
@@ -68,9 +77,8 @@ class AuthRemoteDataSource {
     }
   }
 
-  /// `POST /auth/verify-otp` — confirme le compte créé par [inscrire].
-  /// Route différente de `verify-login-otp` (connexion) : ne pas
-  /// confondre les deux côté backend.
+  /// `POST /auth/verify-otp` — vérifie le code reçu après inscription.
+  /// Distincte de `verify-login-otp` utilisée pour la connexion.
   Future<Map<String, dynamic>> verifierInscriptionOtp({
     required String email,
     required String code,
@@ -86,20 +94,10 @@ class AuthRemoteDataSource {
     }
   }
 
-  /// `POST /auth/resend-otp` — renvoie un nouveau code pour l'inscription.
+  /// `POST /auth/resend-otp` — renvoie un code d'inscription.
   Future<void> renvoyerOtpInscription({required String email}) async {
     try {
       await _apiClient.dio.post(ApiConstants.resendRegisterOtp, data: {'email': email});
-    } on DioException catch (e) {
-      throw ApiClient.toAppException(e);
-    }
-  }
-
-  Future<PatientModel> obtenirProfil() async {
-    try {
-      final response = await _apiClient.dio.get(ApiConstants.me);
-      final data = response.data as Map<String, dynamic>;
-      return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }

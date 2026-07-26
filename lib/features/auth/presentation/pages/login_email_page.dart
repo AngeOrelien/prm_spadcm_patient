@@ -21,9 +21,8 @@ import 'otp_verification_page.dart';
 ///   1. Email + mot de passe -> vérifiés côté serveur.
 ///   2. Code OTP envoyé par email -> [OtpVerificationPage].
 ///
-/// L'inscription libre se fait depuis [InscriptionPage] (lien "Créer un
-/// compte" ci-dessous), atteignable aussi directement depuis la vitrine
-/// publique.
+/// Inscription libre disponible via le lien "Créer un compte" ci-dessous
+/// (voir [InscriptionPage]) — README section 5.
 class LoginEmailPage extends ConsumerStatefulWidget {
   const LoginEmailPage({super.key});
 
@@ -236,17 +235,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                         : () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const InscriptionPage()),
                             ),
-                    child: const Text.rich(
-                      TextSpan(
-                        text: "Pas encore de compte ? ",
-                        children: [
-                          TextSpan(
-                            text: 'Créer un compte',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: const Text('Créer un compte'),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),

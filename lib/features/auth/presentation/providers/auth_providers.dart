@@ -184,10 +184,12 @@ final otpLoginControllerProvider =
   );
 });
 
-// --- État du flux d'inscription libre (vitrine) en 2 étapes ---
-// (infos du compte -> code OTP de confirmation). Calqué sur
-// `OtpLoginController` ci-dessus, mais branché sur `POST /auth/register` +
-// `POST /auth/verify-otp` plutôt que le flux de connexion.
+// --- État du flux d'inscription en 2 étapes (infos -> code OTP) ---
+//
+// Calqué sur OtpLoginState/OtpLoginController (README section 5). Garde le
+// `soinId` visé (si l'inscription a été déclenchée depuis un tap sur
+// "Souscrire" côté vitrine) pour que l'écran appelant sache où rediriger
+// une fois l'OTP validé.
 
 enum InscriptionStep { saisieInfos, saisieCode }
 
@@ -226,7 +228,6 @@ class InscriptionController extends StateNotifier<InscriptionState> {
 
   InscriptionController(this._authRepository, this._authController) : super(const InscriptionState());
 
-  /// Étape 1 : crée le compte, déclenche l'envoi du code OTP.
   Future<bool> inscrire({
     required String nom,
     required String prenom,
@@ -251,10 +252,11 @@ class InscriptionController extends StateNotifier<InscriptionState> {
     }
   }
 
-  Future<bool> renvoyerCode() async {
+  Future<bool> verifierCode(String code) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await _authRepository.renvoyerOtpInscription(email: state.email);
+      final patient = await _authRepository.verifierInscription(email: state.email, code: code);
+      _authController.connecte(patient);
       state = state.copyWith(isLoading: false);
       return true;
     } on AppException catch (e) {
@@ -263,15 +265,10 @@ class InscriptionController extends StateNotifier<InscriptionState> {
     }
   }
 
-  /// Étape 2 : vérifie le code, connecte l'utilisateur (le router redirige
-  /// alors automatiquement — voir `pendingSoinIdProvider` dans
-  /// `features/soins/presentation/providers/soins_providers.dart` pour le
-  /// cas "je voulais souscrire avant de m'inscrire").
-  Future<bool> verifierCode(String code) async {
+  Future<bool> renvoyerCode() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final patient = await _authRepository.verifierInscriptionOtp(email: state.email, code: code);
-      _authController.connecte(patient);
+      await _authRepository.renvoyerOtpInscription(email: state.email);
       state = state.copyWith(isLoading: false);
       return true;
     } on AppException catch (e) {

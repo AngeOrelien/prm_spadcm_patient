@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/config/env_config.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -10,22 +9,18 @@ final soinsRemoteDataSourceProvider = Provider<SoinsRemoteDataSource>((ref) {
   return SoinsRemoteDataSource(ref.watch(apiClientProvider));
 });
 
-/// Mémorise le soin qu'un visiteur non connecté voulait souscrire avant
-/// d'être envoyé vers `/inscription` (ou `/login`) — le router (voir
-/// `router/app_router.dart`) le consulte une fois la connexion établie pour
-/// renvoyer directement vers `/souscrire/:soinId` plutôt que vers
-/// `/accueil` (README frontend §5/§7.2).
-final pendingSoinIdProvider = StateProvider<String?>((ref) => null);
-
-/// `GET /soins` — public. Utilisé aussi bien par la vitrine non connectée
-/// que par l'onglet Soins authentifié (même provider, même appel).
 final catalogueSoinsProvider = FutureProvider.autoDispose<List<SoinCatalogue>>((ref) {
   return ref.watch(soinsRemoteDataSourceProvider).obtenirCatalogue();
 });
 
-/// `GET /soins/:id` — utile pour un lien direct vers l'écran de détail
-/// public sans être passé par le catalogue au préalable.
-final soinDetailProvider = FutureProvider.autoDispose.family<SoinCatalogue, String>((ref, soinId) {
+/// Détail d'un soin par id, utilisé par `/soins-public/:id` et
+/// `soin_detail_page.dart` — d'abord cherché dans le catalogue déjà chargé
+/// (évite un appel réseau superflu), sinon `GET /soins/:id` (deep link).
+final soinProvider = FutureProvider.autoDispose.family<SoinCatalogue, String>((ref, soinId) async {
+  final catalogue = await ref.watch(catalogueSoinsProvider.future);
+  for (final soin in catalogue) {
+    if (soin.id == soinId) return soin;
+  }
   return ref.watch(soinsRemoteDataSourceProvider).obtenirSoin(soinId);
 });
 
@@ -37,31 +32,24 @@ final paiementsProvider = FutureProvider.autoDispose<List<Paiement>>((ref) {
   return ref.watch(soinsRemoteDataSourceProvider).obtenirPaiements();
 });
 
-/// Résultat de l'enchaînement souscription -> paiement -> simulation,
-/// affiché différemment selon le cas (§7.2 du README frontend).
-enum ResultatSouscription {
-  /// Paiement simulé et confirmé immédiatement (environnement local/dev).
-  confirmee,
-
-  /// Paiement créé mais pas encore confirmé (environnement production,
-  /// webhook réel à venir) — souscription en attente.
-  enAttenteConfirmation,
-}
-
-/// Contrôleur de l'enchaînement complet "souscrire" (formulaire patientInfo
-/// -> `POST /souscriptions` -> `POST /paiements` -> simulation en dev) :
-/// expose un état de chargement dédié pour ne pas bloquer toute la page
-/// pendant l'appel.
+/// Contrôleur de l'action "souscrire" : enchaîne
+/// `POST /souscriptions` -> `POST /paiements` -> (local/dev seulement)
+/// `POST /paiements/:id/simuler`, README section 7.2.
+///
+/// En production (Vercel), la simulation n'est pas appelée : la
+/// souscription reste `en_attente_paiement` jusqu'à ce que le webhook réel
+/// la confirme, et [souscrire] renvoie quand même `true` (l'appel a
+/// réussi), à charge de l'écran appelant d'afficher un message adapté via
+/// [derniereConfirmationImmediate].
 class SouscriptionController extends AsyncNotifier<void> {
+  bool _derniereConfirmationImmediate = false;
+
+  bool get derniereConfirmationImmediate => _derniereConfirmationImmediate;
+
   @override
   Future<void> build() async {}
 
-  /// Lance l'enchaînement complet. En cas de `409` (souscription déjà en
-  /// cours ailleurs), l'erreur remonte telle quelle dans `state.error` — son
-  /// message (déjà rédigé pour l'utilisateur final par le backend) est à
-  /// afficher directement, avec une proposition de "terminer" la
-  /// souscription actuelle (voir [TerminerSouscriptionController]).
-  Future<ResultatSouscription?> souscrireEtPayer({
+  Future<bool> souscrire({
     required String soinId,
     PatientInfoSouscription? patientInfo,
     String moyenPaiement = 'mobile_money',
@@ -69,32 +57,25 @@ class SouscriptionController extends AsyncNotifier<void> {
     state = const AsyncLoading();
     try {
       final dataSource = ref.read(soinsRemoteDataSourceProvider);
-
       final souscriptionId = await dataSource.souscrire(soinId: soinId, patientInfo: patientInfo);
       final paiementId = await dataSource.creerPaiement(
         souscriptionId: souscriptionId,
         moyenPaiement: moyenPaiement,
       );
 
-      ResultatSouscription resultat;
+      _derniereConfirmationImmediate = !EnvConfig.isVercel;
       if (!EnvConfig.isVercel) {
-        // Local/dev : confirmation immédiate, pas d'attente d'un vrai
-        // webhook (voir `PAIEMENT_SIMULATION_ACTIVE` côté backend).
-        await dataSource.simulerPaiement(paiementId, reussi: true);
-        resultat = ResultatSouscription.confirmee;
-      } else {
-        // Production : la route de simulation répond 403 par design, on
-        // laisse le vrai webhook confirmer plus tard.
-        resultat = ResultatSouscription.enAttenteConfirmation;
+        // Local/dev : confirmation immédiate, pas d'attente de webhook réel.
+        await dataSource.simulerPaiement(paiementId);
       }
 
       ref.invalidate(souscriptionsProvider);
       ref.invalidate(paiementsProvider);
       state = const AsyncData(null);
-      return resultat;
+      return true;
     } catch (e, st) {
       state = AsyncError(e, st);
-      return null;
+      return false;
     }
   }
 }
@@ -103,8 +84,9 @@ final souscriptionControllerProvider = AsyncNotifierProvider<SouscriptionControl
   SouscriptionController.new,
 );
 
-/// Contrôleur dédié à "Mettre fin à ma souscription actuelle" (§7.3 du
-/// README frontend) — état de chargement séparé du reste de la page.
+/// Contrôleur de l'action "mettre fin à ma souscription" (README section
+/// 7.3), séparé de [SouscriptionController] pour ne pas mélanger les deux
+/// états de chargement dans l'UI.
 class TerminerSouscriptionController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
@@ -114,6 +96,21 @@ class TerminerSouscriptionController extends AsyncNotifier<void> {
     try {
       await ref.read(soinsRemoteDataSourceProvider).terminerSouscription(souscriptionId);
       ref.invalidate(souscriptionsProvider);
+      ref.invalidate(paiementsProvider);
+      state = const AsyncData(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> annuler(String souscriptionId) async {
+    state = const AsyncLoading();
+    try {
+      await ref.read(soinsRemoteDataSourceProvider).annulerSouscription(souscriptionId);
+      ref.invalidate(souscriptionsProvider);
+      ref.invalidate(paiementsProvider);
       state = const AsyncData(null);
       return true;
     } catch (e, st) {

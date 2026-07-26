@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/utils/validators.dart';
@@ -7,11 +8,18 @@ import '../../../../shared/widgets/buttons/app_primary_button.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/otp_code_field.dart';
 
-/// Vérification du code OTP d'inscription (`POST /auth/verify-otp`) —
-/// distincte de [OtpVerificationPage] utilisée pour la connexion, qui
-/// appelle `verify-login-otp` (README frontend §5).
+/// Vérification du code OTP d'inscription (README section 5), branchée sur
+/// `InscriptionController.verifierCode` — distincte de
+/// `OtpVerificationPage` utilisée pour la connexion.
+///
+/// Si [soinId] est renseigné (inscription déclenchée depuis un tap
+/// "Souscrire" sur `/soins-public/:id`), redirige directement vers le
+/// formulaire de souscription de ce soin une fois le compte vérifié,
+/// plutôt que vers l'accueil.
 class InscriptionOtpPage extends ConsumerStatefulWidget {
-  const InscriptionOtpPage({super.key});
+  final String? soinId;
+
+  const InscriptionOtpPage({super.key, this.soinId});
 
   @override
   ConsumerState<InscriptionOtpPage> createState() => _InscriptionOtpPageState();
@@ -40,10 +48,14 @@ class _InscriptionOtpPageState extends ConsumerState<InscriptionOtpPage> {
       context.showError(erreur ?? 'Code invalide');
       return;
     }
-    // Compte confirmé et connecté : le router (redirect sur
-    // `authControllerProvider`) bascule automatiquement vers `/accueil`, ou
-    // vers `/souscrire/:soinId` si un soin était en attente (voir
-    // `pendingSoinIdProvider`).
+
+    // Le compte est désormais connecté (authControllerProvider mis à jour) :
+    // on revient directement au parcours de souscription si un soin était
+    // visé, sinon le router redirige naturellement vers /accueil.
+    final soinId = widget.soinId;
+    if (soinId != null) {
+      context.go('/soins/souscrire/$soinId');
+    }
   }
 
   Future<void> _renvoyerCode() async {
@@ -65,7 +77,7 @@ class _InscriptionOtpPageState extends ConsumerState<InscriptionOtpPage> {
     final isLoading = ref.watch(inscriptionControllerProvider.select((s) => s.isLoading));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Confirmez votre compte')),
+      appBar: AppBar(title: const Text('Vérification')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -90,7 +102,7 @@ class _InscriptionOtpPageState extends ConsumerState<InscriptionOtpPage> {
                   ),
                   const SizedBox(height: 24),
                   AppPrimaryButton(
-                    label: 'Confirmer',
+                    label: 'Vérifier',
                     isLoading: isLoading,
                     onPressed: _verifier,
                   ),

@@ -3,16 +3,14 @@ import 'package:dio/dio.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../shared/services/api_client.dart';
 
-/// `POST /contact` — formulaire de la vitrine ("poser une question à propos
-/// de SPAD"), volontairement public : aucun token n'est attaché (aucun
-/// compte requis), distinct de la messagerie interne patient/AVS.
+/// `POST /contact` — formulaire de contact public de la vitrine
+/// (README section 4). Aucun token à attacher : `ApiClient` n'ajoute pas
+/// d'`Authorization` en l'absence de session de toute façon.
 class ContactRemoteDataSource {
   final ApiClient _apiClient;
 
   ContactRemoteDataSource(this._apiClient);
 
-  /// Un `email` OU un `telephone` est obligatoire (validation backend) — un
-  /// `429` est renvoyé au-delà de 10 messages / 15 min par IP (anti-spam).
   Future<void> envoyerMessage({
     required String nom,
     String? email,

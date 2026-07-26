@@ -9,14 +9,27 @@ import '../../../../shared/widgets/buttons/app_primary_button.dart';
 import '../../../../shared/widgets/inputs/app_text_field.dart';
 import '../providers/contact_providers.dart';
 
-/// Formulaire public "Poser une question à propos de SPAD" (README frontend
-/// §4), accessible sans compte depuis la vitrine. Un email OU un téléphone
-/// est requis — même règle que la validation backend.
+/// Formulaire de contact public de la vitrine (README section 4). Affiché
+/// soit en route dédiée (`/contact`), soit via [showContactSheet] en
+/// bottom sheet directement depuis `/vitrine` — plus léger si on ne veut
+/// pas d'une route à part.
 class ContactPage extends ConsumerStatefulWidget {
   const ContactPage({super.key});
 
   @override
   ConsumerState<ContactPage> createState() => _ContactPageState();
+}
+
+Future<void> showContactSheet(BuildContext context) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => const Padding(
+      padding: EdgeInsets.only(top: AppSpacing.md),
+      child: ContactPage(),
+    ),
+  );
 }
 
 class _ContactPageState extends ConsumerState<ContactPage> {
@@ -37,11 +50,10 @@ class _ContactPageState extends ConsumerState<ContactPage> {
     super.dispose();
   }
 
-  String? _validerEmailOuTelephone(String? value) {
-    final emailRenseigne = _emailController.text.trim().isNotEmpty;
-    final telephoneRenseigne = _telephoneController.text.trim().isNotEmpty;
-    if (!emailRenseigne && !telephoneRenseigne) {
-      return 'Renseignez au moins un email ou un téléphone';
+  String? _emailOuTelephoneValidator(String? value) {
+    final autreRenseigne = _emailController.text.trim().isNotEmpty || _telephoneController.text.trim().isNotEmpty;
+    if (!autreRenseigne) {
+      return 'Renseigne au moins un email ou un téléphone';
     }
     return null;
   }
@@ -51,107 +63,100 @@ class _ContactPageState extends ConsumerState<ContactPage> {
 
     final controller = ref.read(contactControllerProvider.notifier);
     final succes = await controller.envoyer(
-      nom: _nomController.text,
+      nom: _nomController.text.trim(),
       email: _emailController.text,
       telephone: _telephoneController.text,
-      sujet: _sujetController.text,
-      message: _messageController.text,
+      sujet: _sujetController.text.trim(),
+      message: _messageController.text.trim(),
     );
 
     if (!mounted) return;
 
     if (succes) {
-      context.showInfo('Message envoyé. L\'équipe SPAD Cameroun vous répondra bientôt.');
-      Navigator.of(context).maybePop();
+      context.showInfo('Votre message a été envoyé, merci !');
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     } else {
-      final erreur = ref.read(contactControllerProvider).error;
-      final estLimite = erreur is AppException && erreur.isRateLimited;
-      context.showError(
-        estLimite
-            ? 'Trop de messages envoyés, réessayez dans quelques minutes.'
-            : (erreur is AppException ? erreur.message : "L'envoi a échoué, réessayez."),
-      );
+      final erreur = ref.read(contactControllerProvider).asError?.error;
+      final message = erreur is AppException
+          ? (erreur.isRateLimited
+              ? 'Trop de messages envoyés, réessaie dans quelques minutes.'
+              : erreur.message)
+          : 'Impossible d\'envoyer le message, réessaie.';
+      context.showError(message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(contactControllerProvider).isLoading;
-    final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Poser une question')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Une question sur le suivi SPAD ou nos services ? Écrivez-nous, sans créer de compte.',
-                  style: textTheme.bodyMedium,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                AppTextField(
-                  controller: _nomController,
-                  label: 'Nom',
-                  hint: 'Votre nom',
-                  validator: (v) => Validators.requis(v, champ: 'Le nom'),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                AppTextField(
-                  controller: _emailController,
-                  label: 'Email',
-                  hint: 'exemple@email.com (optionnel si téléphone renseigné)',
-                  keyboardType: TextInputType.emailAddress,
-                  validator: _validerEmailOuTelephone,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                AppTextField(
-                  controller: _telephoneController,
-                  label: 'Téléphone',
-                  hint: '699000000 (optionnel si email renseigné)',
-                  keyboardType: TextInputType.phone,
-                  validator: _validerEmailOuTelephone,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                AppTextField(
-                  controller: _sujetController,
-                  label: 'Sujet',
-                  hint: 'Ex : Question sur le suivi SPAD',
-                  validator: (v) => Validators.requis(v, champ: 'Le sujet'),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                TextFormField(
-                  controller: _messageController,
-                  maxLines: 5,
-                  validator: (v) => Validators.requis(v, champ: 'Le message'),
-                  decoration: const InputDecoration(
-                    labelText: 'Message',
-                    hintText: 'Votre question...',
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                AppPrimaryButton(
-                  label: 'Envoyer',
-                  isLoading: isLoading,
-                  onPressed: _envoyer,
-                ),
-              ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        top: AppSpacing.md,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(4)),
+              ),
             ),
-          ),
+            Text('Une question ?', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              "L'équipe SPAD Cameroun vous répond rapidement.",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppTextField(
+              controller: _nomController,
+              label: 'Nom',
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Le nom est requis' : null,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _emailController,
+              label: 'Email (facultatif si téléphone renseigné)',
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) => (v != null && v.trim().isNotEmpty) ? Validators.email(v) : _emailOuTelephoneValidator(v),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _telephoneController,
+              label: 'Téléphone (facultatif si email renseigné)',
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _sujetController,
+              label: 'Sujet',
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Le sujet est requis' : null,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _messageController,
+              label: 'Message',
+              maxLines: 4,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Le message est requis' : null,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppPrimaryButton(label: 'Envoyer', isLoading: isLoading, onPressed: _envoyer),
+            const SizedBox(height: AppSpacing.md),
+          ],
         ),
       ),
     );
