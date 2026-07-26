@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/env_config.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
@@ -43,7 +43,14 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     super.dispose();
   }
 
-  // Future<void> _soumettre() async {
+  // ⚠️ Flux de connexion à 2 facteurs (mot de passe -> code OTP par email) —
+  // COMMENTÉ TEMPORAIREMENT, à réactiver en repassant
+  // `EnvConfig.otpBypassActive` à `false` en retirant `BYPASS_OTP` du `.env`
+  // (voir core/config/env_config.dart).
+  // Le code ci-dessous reste intact et fonctionnel, il suffit de le
+  // décommenter et de retirer la méthode `_soumettre` bypass juste en dessous.
+  //
+  // Future<void> _soumettreAvecOtp() async {
   //   if (!_formKey.currentState!.validate()) return;
   //
   //   final controller = ref.read(otpLoginControllerProvider.notifier);
@@ -63,25 +70,28 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
   //     context.showError(erreur ?? 'Email ou mot de passe incorrect');
   //   }
   // }
+
   Future<void> _soumettre() async {
     if (!_formKey.currentState!.validate()) return;
 
     final controller = ref.read(otpLoginControllerProvider.notifier);
 
-    final succes = kDebugMode
+    final succes = EnvConfig.otpBypassActive
         ? await controller.connexionTest(
-      email: _emailController.text.trim(),
-      motDePasse: _passwordController.text,
-    )
+            email: _emailController.text.trim(),
+            motDePasse: _passwordController.text,
+          )
         : await controller.demanderCode(
-      email: _emailController.text.trim(),
-      motDePasse: _passwordController.text,
-    );
+            email: _emailController.text.trim(),
+            motDePasse: _passwordController.text,
+          );
 
     if (!mounted) return;
 
     if (succes) {
-      if (kDebugMode) return; // déjà connecté, pas d'écran OTP à afficher
+      // Bypass actif : le compte est déjà connecté (tokens obtenus via
+      // /auth/test/login), il n'y a pas d'écran OTP à afficher.
+      if (EnvConfig.otpBypassActive) return;
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const OtpVerificationPage()),
       );

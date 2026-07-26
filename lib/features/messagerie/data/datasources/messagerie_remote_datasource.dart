@@ -1,16 +1,13 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/api_constants.dart';
-import '../../../../shared/mock/mock_api.dart';
 import '../../../../shared/services/api_client.dart';
 import '../../domain/entities/messagerie_entities.dart';
 import '../models/messagerie_models.dart';
 
-/// Tant que Socket.io n'est pas branché côté backend (Phase 4 de la feuille
-/// de route), la messagerie fonctionne en mode "pull" via [MockApi] :
-/// chaque envoi ajoute le message localement, sans temps réel entre
-/// appareils. La forme des méthodes est déjà prête pour un futur
+/// Messagerie en mode "pull" (pas de Socket.io côté backend pour l'instant) :
+/// chaque écran recharge via ces appels REST plutôt que de recevoir des
+/// événements temps réel. La forme des méthodes reste prête pour un futur
 /// remplacement par des événements socket.
 class MessagerieRemoteDataSource {
   final ApiClient _apiClient;
@@ -18,26 +15,22 @@ class MessagerieRemoteDataSource {
   MessagerieRemoteDataSource(this._apiClient);
 
   Future<List<Conversation>> obtenirConversations() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.conversations();
-      return data.map(ConversationModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.conversations);
-      return (response.data as List).map((e) => ConversationModel.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      return (data['conversations'] as List)
+          .map((e) => ConversationModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
   }
 
   Future<List<MessageConversation>> obtenirMessages(String conversationId) async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.messages(conversationId);
-      return data.map(MessageConversationModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get('${ApiConstants.conversations}/$conversationId/messages');
-      return (response.data as List)
+      final data = response.data as Map<String, dynamic>;
+      return (data['messages'] as List)
           .map((e) => MessageConversationModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -46,10 +39,6 @@ class MessagerieRemoteDataSource {
   }
 
   Future<void> envoyerMessage({required String conversationId, required String contenu}) async {
-    if (AppConfig.useMockBackend) {
-      await MockApi.envoyerMessage(conversationId: conversationId, contenu: contenu);
-      return;
-    }
     try {
       await _apiClient.dio.post(
         '${ApiConstants.conversations}/$conversationId/messages',
@@ -60,13 +49,11 @@ class MessagerieRemoteDataSource {
     }
   }
 
+  /// ⚠️ `PATCH .../:id/marquer-lu` (pas `POST .../:id/lu`, qui n'existe pas
+  /// côté backend).
   Future<void> marquerLue(String conversationId) async {
-    if (AppConfig.useMockBackend) {
-      await MockApi.marquerConversationLue(conversationId);
-      return;
-    }
     try {
-      await _apiClient.dio.post('${ApiConstants.conversations}/$conversationId/lu');
+      await _apiClient.dio.patch('${ApiConstants.conversations}/$conversationId/marquer-lu');
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }

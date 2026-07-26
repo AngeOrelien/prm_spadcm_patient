@@ -1,50 +1,54 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/api_constants.dart';
-import '../../../../shared/mock/mock_api.dart';
 import '../../../../shared/services/api_client.dart';
 import '../../domain/entities/dossier_entities.dart';
 import '../models/dossier_models.dart';
 
+/// Toutes les requêtes du feature Dossier vers `prm-spad-backend`.
+///
+/// Chaque liste renvoyée par le backend est enveloppée dans un objet
+/// `{ success, resultats, <clé> : [...] }` (jamais un tableau JSON brut) —
+/// c'est le même format que ce qu'on retrouve côté personnel/coordonnateur.
 class DossierRemoteDataSource {
   final ApiClient _apiClient;
 
   DossierRemoteDataSource(this._apiClient);
 
+  /// `GET /patients/moi` renvoie `{ success, patient, avsAssigne }` : le
+  /// contenu utile pour [ResumePatientModel] est nichée sous `patient`.
   Future<ResumePatient> obtenirResumePatient() async {
-    if (AppConfig.useMockBackend) {
-      return ResumePatientModel.fromJson(await MockApi.patient());
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.monDossier);
-      return ResumePatientModel.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      return ResumePatientModel.fromJson(data['patient'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
   }
 
+  /// `GET /traitements` — le backend déduit automatiquement le patient
+  /// depuis le compte connecté (aucun `patientId` à transmettre depuis
+  /// l'app Patients/Familles).
   Future<List<Traitement>> obtenirTraitements() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.traitements();
-      return data.map(TraitementModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.mesTraitements);
-      return (response.data as List).map((e) => TraitementModel.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      return (data['traitements'] as List)
+          .map((e) => TraitementModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
   }
 
+  /// `GET /rapports` — ne renvoie que les rapports déjà validés par un
+  /// médecin pour un compte patient (filtré côté serveur).
   Future<List<RapportJournalier>> obtenirRapports() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.rapportsJournaliers();
-      return data.map(RapportJournalierModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.mesRapports);
-      return (response.data as List)
+      final data = response.data as Map<String, dynamic>;
+      return (data['rapports'] as List)
           .map((e) => RapportJournalierModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -53,13 +57,12 @@ class DossierRemoteDataSource {
   }
 
   Future<List<Appreciation>> obtenirAppreciations() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.appreciations();
-      return data.map(AppreciationModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.mesAppreciations);
-      return (response.data as List).map((e) => AppreciationModel.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      return (data['appreciations'] as List)
+          .map((e) => AppreciationModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
@@ -67,10 +70,6 @@ class DossierRemoteDataSource {
 
   /// UC7 "Noter les tâches quotidiennes réalisées par l'AVS".
   Future<void> noterAvs({required String rapportId, required int note, required String commentaire}) async {
-    if (AppConfig.useMockBackend) {
-      await MockApi.noterAvs(rapportId: rapportId, note: note, commentaire: commentaire);
-      return;
-    }
     try {
       await _apiClient.dio.post(
         ApiConstants.mesAppreciations,
@@ -82,26 +81,26 @@ class DossierRemoteDataSource {
   }
 
   Future<List<DocumentMedicalDossier>> obtenirDocuments() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.documentsMedicaux();
-      return data.map(DocumentMedicalModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.mesDocuments);
-      return (response.data as List).map((e) => DocumentMedicalModel.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      return (data['documents'] as List)
+          .map((e) => DocumentMedicalModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
   }
 
+  /// `GET /rendezvous` — attention à la casse : le backend renvoie la clé
+  /// `rendezVous` (V majuscule), pas `rendezvous`.
   Future<List<RendezVousDossier>> obtenirRendezVous() async {
-    if (AppConfig.useMockBackend) {
-      final data = await MockApi.rendezVous();
-      return data.map(RendezVousModel.fromJson).toList();
-    }
     try {
       final response = await _apiClient.dio.get(ApiConstants.mesRendezVous);
-      return (response.data as List).map((e) => RendezVousModel.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      return (data['rendezVous'] as List)
+          .map((e) => RendezVousModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }

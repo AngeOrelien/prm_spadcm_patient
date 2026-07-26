@@ -1,9 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/api_constants.dart';
-import '../../../../shared/mock/mock_api.dart';
 import '../../../../shared/services/api_client.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../dashboard/presentation/providers/dashboard_providers.dart';
@@ -13,13 +11,9 @@ class AlerteRemoteDataSource {
 
   AlerteRemoteDataSource(this._apiClient);
 
-  /// UC4 "Déclencher alerte SOS" : crée l'alerte et notifie (en Phase 3
-  /// réelle) l'AVS de garde + le coordonnateur via FCM.
+  /// UC4 "Déclencher alerte SOS". Le backend déduit `patientId` de la fiche
+  /// liée au compte connecté ; l'app n'a jamais besoin de le transmettre.
   Future<void> declencherAlerte({String? description}) async {
-    if (AppConfig.useMockBackend) {
-      await MockApi.declencherAlerte(description: description);
-      return;
-    }
     try {
       await _apiClient.dio.post(ApiConstants.alertes, data: {'type': 'sos', 'description': description});
     } on DioException catch (e) {
