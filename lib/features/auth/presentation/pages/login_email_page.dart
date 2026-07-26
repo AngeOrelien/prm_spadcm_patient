@@ -14,15 +14,16 @@ import '../../../../shared/widgets/inputs/app_text_field.dart';
 import '../../../../shared/widgets/misc/app_circle_icon_button.dart';
 import '../../../../shared/widgets/misc/app_or_divider.dart';
 import '../providers/auth_providers.dart';
+import 'inscription_page.dart';
 import 'otp_verification_page.dart';
 
 /// Écran de connexion de l'app Patients/Familles. Flux en 2 étapes :
 ///   1. Email + mot de passe -> vérifiés côté serveur.
 ///   2. Code OTP envoyé par email -> [OtpVerificationPage].
 ///
-/// Pas d'inscription libre ici pour l'instant : le compte est provisionné
-/// au dossier du patient par SPAD Cameroun (cf. feuille de route, section
-/// "Prochaines étapes" du README).
+/// L'inscription libre se fait depuis [InscriptionPage] (lien "Créer un
+/// compte" ci-dessous), atteignable aussi directement depuis la vitrine
+/// publique.
 class LoginEmailPage extends ConsumerStatefulWidget {
   const LoginEmailPage({super.key});
 
@@ -225,6 +226,28 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                         const Icon(Icons.g_mobiledata, size: 26),
                   ),
                   onPressed: isLoading ? null : _continuerAvecGoogle,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                Center(
+                  child: TextButton(
+                    onPressed: isLoading
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const InscriptionPage()),
+                            ),
+                    child: const Text.rich(
+                      TextSpan(
+                        text: "Pas encore de compte ? ",
+                        children: [
+                          TextSpan(
+                            text: 'Créer un compte',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],

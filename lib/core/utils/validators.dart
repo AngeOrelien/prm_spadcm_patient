@@ -23,6 +23,23 @@ class Validators {
     return null;
   }
 
+  static String? requis(String? value, {String champ = 'Ce champ'}) {
+    if (value == null || value.trim().isEmpty) {
+      return '$champ est requis';
+    }
+    return null;
+  }
+
+  static String? telephone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Le téléphone est requis';
+    }
+    if (value.trim().replaceAll(RegExp(r'[\s-]'), '').length < 8) {
+      return 'Numéro de téléphone invalide';
+    }
+    return null;
+  }
+
   static String? otpCode(String? value, {int length = 6}) {
     if (value == null || value.trim().isEmpty) {
       return 'Le code est requis';

@@ -40,6 +40,61 @@ class AuthRemoteDataSource {
     }
   }
 
+  /// `POST /auth/register` — inscription libre depuis la vitrine, toujours
+  /// avec `role: patient` (jamais exposé à l'utilisateur, README frontend
+  /// §5). Déclenche l'envoi d'un code OTP par email pour confirmer le
+  /// compte (`verifierInscriptionOtp`).
+  Future<void> inscrire({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String telephone,
+    required String motDePasse,
+  }) async {
+    try {
+      await _apiClient.dio.post(
+        ApiConstants.register,
+        data: {
+          'nom': nom,
+          'prenom': prenom,
+          'email': email,
+          'telephone': telephone,
+          'motDePasse': motDePasse,
+          'role': 'patient',
+        },
+      );
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
+  /// `POST /auth/verify-otp` — confirme le compte créé par [inscrire].
+  /// Route différente de `verify-login-otp` (connexion) : ne pas
+  /// confondre les deux côté backend.
+  Future<Map<String, dynamic>> verifierInscriptionOtp({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        ApiConstants.verifyRegisterOtp,
+        data: {'email': email, 'code': code},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
+  /// `POST /auth/resend-otp` — renvoie un nouveau code pour l'inscription.
+  Future<void> renvoyerOtpInscription({required String email}) async {
+    try {
+      await _apiClient.dio.post(ApiConstants.resendRegisterOtp, data: {'email': email});
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
   Future<PatientModel> obtenirProfil() async {
     try {
       final response = await _apiClient.dio.get(ApiConstants.me);

@@ -183,3 +183,112 @@ final otpLoginControllerProvider =
     ref.read(authControllerProvider.notifier),
   );
 });
+
+// --- État du flux d'inscription libre (vitrine) en 2 étapes ---
+// (infos du compte -> code OTP de confirmation). Calqué sur
+// `OtpLoginController` ci-dessus, mais branché sur `POST /auth/register` +
+// `POST /auth/verify-otp` plutôt que le flux de connexion.
+
+enum InscriptionStep { saisieInfos, saisieCode }
+
+class InscriptionState {
+  final InscriptionStep step;
+  final String email;
+  final bool isLoading;
+  final String? errorMessage;
+
+  const InscriptionState({
+    this.step = InscriptionStep.saisieInfos,
+    this.email = '',
+    this.isLoading = false,
+    this.errorMessage,
+  });
+
+  InscriptionState copyWith({
+    InscriptionStep? step,
+    String? email,
+    bool? isLoading,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return InscriptionState(
+      step: step ?? this.step,
+      email: email ?? this.email,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+class InscriptionController extends StateNotifier<InscriptionState> {
+  final AuthRepository _authRepository;
+  final AuthController _authController;
+
+  InscriptionController(this._authRepository, this._authController) : super(const InscriptionState());
+
+  /// Étape 1 : crée le compte, déclenche l'envoi du code OTP.
+  Future<bool> inscrire({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String telephone,
+    required String motDePasse,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _authRepository.inscrire(
+        nom: nom,
+        prenom: prenom,
+        email: email,
+        telephone: telephone,
+        motDePasse: motDePasse,
+      );
+      state = state.copyWith(isLoading: false, email: email, step: InscriptionStep.saisieCode);
+      return true;
+    } on AppException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    }
+  }
+
+  Future<bool> renvoyerCode() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _authRepository.renvoyerOtpInscription(email: state.email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on AppException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    }
+  }
+
+  /// Étape 2 : vérifie le code, connecte l'utilisateur (le router redirige
+  /// alors automatiquement — voir `pendingSoinIdProvider` dans
+  /// `features/soins/presentation/providers/soins_providers.dart` pour le
+  /// cas "je voulais souscrire avant de m'inscrire").
+  Future<bool> verifierCode(String code) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final patient = await _authRepository.verifierInscriptionOtp(email: state.email, code: code);
+      _authController.connecte(patient);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on AppException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    }
+  }
+
+  void reinitialiser() {
+    state = const InscriptionState();
+  }
+}
+
+final inscriptionControllerProvider =
+    StateNotifierProvider.autoDispose<InscriptionController, InscriptionState>((ref) {
+  return InscriptionController(
+    ref.read(authRepositoryProvider),
+    ref.read(authControllerProvider.notifier),
+  );
+});

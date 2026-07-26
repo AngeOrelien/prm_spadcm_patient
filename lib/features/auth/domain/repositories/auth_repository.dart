@@ -27,4 +27,23 @@ abstract class AuthRepository {
     required String email,
     required String motDePasse,
   });
+
+  /// Étape 1 de l'inscription libre (vitrine) : crée le compte `patient` et
+  /// déclenche l'envoi d'un code OTP par email.
+  Future<void> inscrire({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String telephone,
+    required String motDePasse,
+  });
+
+  /// Étape 2 : vérifie le code reçu, sauvegarde les tokens et renvoie le
+  /// profil du compte tout juste créé.
+  Future<Patient> verifierInscriptionOtp({
+    required String email,
+    required String code,
+  });
+
+  Future<void> renvoyerOtpInscription({required String email});
 }

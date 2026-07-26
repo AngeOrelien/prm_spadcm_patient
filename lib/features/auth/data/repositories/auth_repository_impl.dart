@@ -73,4 +73,53 @@ class AuthRepositoryImpl implements AuthRepository {
 
     return PatientModel.fromJson(data['utilisateur'] as Map<String, dynamic>);
   }
+
+  @override
+  Future<void> inscrire({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String telephone,
+    required String motDePasse,
+  }) {
+    return _remoteDataSource.inscrire(
+      nom: nom.trim(),
+      prenom: prenom.trim(),
+      email: email.trim().toLowerCase(),
+      telephone: telephone.trim(),
+      motDePasse: motDePasse,
+    );
+  }
+
+  @override
+  Future<Patient> verifierInscriptionOtp({
+    required String email,
+    required String code,
+  }) async {
+    final data = await _remoteDataSource.verifierInscriptionOtp(
+      email: email.trim().toLowerCase(),
+      code: code.trim(),
+    );
+
+    await _storage.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+
+    // Selon les versions du backend, `verify-otp` peut ou non renvoyer le
+    // profil complet dans la même réponse que les tokens (voir §1.2 du
+    // TESTING-README, moins détaillé que pour `verify-login-otp`) — on
+    // retombe sur `GET /auth/me` si `utilisateur` est absent, plutôt que de
+    // planter sur un cast raté.
+    final utilisateurJson = data['utilisateur'] as Map<String, dynamic>?;
+    if (utilisateurJson != null) {
+      return PatientModel.fromJson(utilisateurJson);
+    }
+    return _remoteDataSource.obtenirProfil();
+  }
+
+  @override
+  Future<void> renvoyerOtpInscription({required String email}) {
+    return _remoteDataSource.renvoyerOtpInscription(email: email.trim().toLowerCase());
+  }
 }

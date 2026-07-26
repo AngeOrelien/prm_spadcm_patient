@@ -27,6 +27,12 @@ class ApiConstants {
   static const String refreshToken = '/auth/refresh-token';
   static const String me = '/auth/me';
 
+  // --- Auth : inscription libre (vitrine publique) — section 5 du README
+  // frontend, distincte de la connexion OTP ci-dessus. ---
+  static const String register = '/auth/register';
+  static const String verifyRegisterOtp = '/auth/verify-otp';
+  static const String resendRegisterOtp = '/auth/resend-otp';
+
   // --- Tableau de bord santé (UC2) : agrégat servi en un seul appel par
   // GET /api/patients/moi/dashboard, voir `DashboardRemoteDataSource`. ---
   static const String monDossier = '/patients/moi';
@@ -40,10 +46,21 @@ class ApiConstants {
 
   // --- Soins : catalogue, souscription, paiements (README section 3.1 /
   // routes/soinRoutes.js + souscriptionRoutes.js). ---
+  // `GET /soins` et `GET /soins/:id` sont publics (pas de token requis) —
+  // c'est ce qui permet à la vitrine non connectée de les appeler tel quel.
   static const String catalogueSoins = '/soins';
   static const String souscriptions = '/souscriptions';
   static const String mesSouscriptions = '/souscriptions/moi';
+  static const String paiements = '/paiements';
   static const String mesPaiements = '/paiements/moi';
+
+  static String soin(String id) => '/soins/$id';
+  static String souscriptionTerminer(String id) => '/souscriptions/$id/terminer';
+  static String souscriptionAnnuler(String id) => '/souscriptions/$id/annuler';
+  static String paiementSimuler(String id) => '/paiements/$id/simuler';
+
+  // --- Contact public (vitrine, sans compte) ---
+  static const String contact = '/contact';
 
   // --- Dossier médical : traitements, rapports, documents, rendez-vous ---
   static const String mesTraitements = '/traitements';

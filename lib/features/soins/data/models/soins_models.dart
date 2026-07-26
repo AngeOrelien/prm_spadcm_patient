@@ -12,6 +12,9 @@ class SoinCatalogueModel {
       prix: (json['prix'] as num?)?.toInt() ?? 0,
       frequenceVisites: json['frequenceVisites'] as String? ?? '',
       prestationsIncluses: (json['prestationsIncluses'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      imageCouverture: json['imageCouverture'] as String?,
+      images: (json['images'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      videos: (json['videos'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 }
@@ -20,8 +23,12 @@ class SouscriptionModel {
   static Souscription fromJson(Map<String, dynamic> json) {
     final soin = json['soinId'];
     final soinMap = soin is Map ? soin : const {};
+    // `soinId` peut être un id brut (String) si le backend ne l'a pas
+    // "populate", ou l'objet soin complet une fois peuplé — on gère les deux.
+    final soinIdValeur = soin is Map ? (soin['_id'] ?? soin['id']) : soin;
     return Souscription(
       id: (json['_id'] ?? json['id']).toString(),
+      soinId: soinIdValeur?.toString(),
       soinNom: soinMap['nom'] as String? ?? 'Soin SPAD Cameroun',
       soinPrix: (soinMap['prix'] as num?)?.toInt() ?? 0,
       dateDebut: _dateOrNow(json['dateDebut']),

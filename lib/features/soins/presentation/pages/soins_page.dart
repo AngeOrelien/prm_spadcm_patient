@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/extensions/context_extensions.dart';
@@ -8,6 +9,7 @@ import '../../../../core/theme/app_dimens.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
 import '../../domain/entities/soins_entities.dart';
 import '../providers/soins_providers.dart';
+import '../widgets/soin_card.dart';
 
 const _mois = [
   'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
@@ -16,10 +18,10 @@ const _mois = [
 
 String _dateCourte(DateTime date) => '${date.day} ${_mois[date.month - 1]}  ${date.year}';
 
-String _prix(int prix) => '${prix.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} FCFA';
-
-/// Onglet 2 — Soins (section 7.1 README) : recherche/catalogue de soins,
-/// souscription, historique des paiements.
+/// Onglet 2 — Soins (section 7.1 README) : recherche/catalogue de soins
+/// illustré, souscription (avec formulaire patientInfo + paiement),
+/// historique des paiements. C'est ce que le README frontend appelle
+/// l'onglet "services".
 class SoinsPage extends ConsumerWidget {
   const SoinsPage({super.key});
 
@@ -53,9 +55,37 @@ class SoinsPage extends ConsumerWidget {
 class _SouscriptionActiveSection extends ConsumerWidget {
   const _SouscriptionActiveSection();
 
+  Future<void> _terminer(BuildContext context, WidgetRef ref, Souscription souscription) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mettre fin à votre souscription'),
+        content: Text(
+          'Mettre fin à "${souscription.soinNom}" maintenant ? Vous pourrez alors souscrire à un '
+          'autre service, mais le suivi actuel s\'arrêtera.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirmer')),
+        ],
+      ),
+    );
+    if (confirme != true || !context.mounted) return;
+
+    final succes = await ref.read(terminerSouscriptionControllerProvider.notifier).terminer(souscription.id);
+    if (!context.mounted) return;
+    if (succes) {
+      context.showInfo('Souscription terminée.');
+    } else {
+      context.showError('Impossible de terminer la souscription, réessayez.');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final souscriptionsAsync = ref.watch(souscriptionsProvider);
+    final terminerLoading = ref.watch(terminerSouscriptionControllerProvider).isLoading;
+
     return souscriptionsAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -66,13 +96,15 @@ class _SouscriptionActiveSection extends ConsumerWidget {
         child: Text(e is AppException ? e.message : 'Erreur de chargement', style: Theme.of(context).textTheme.bodySmall),
       ),
       data: (souscriptions) {
-        if (souscriptions.isEmpty) {
+        final active = souscriptions.where((s) => s.estBloquante).toList();
+        if (active.isEmpty) {
           return const EmptyStateCard(
             icon: Icons.medical_information_outlined,
             message: "Aucune souscription active. Choisissez un forfait dans le catalogue ci-dessous.",
           );
         }
-        final souscription = souscriptions.first;
+        final souscription = active.first;
+        final estActive = souscription.statut == StatutSouscription.active;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 6),
           child: Container(
@@ -94,19 +126,28 @@ class _SouscriptionActiveSection extends ConsumerWidget {
                       ),
                     ),
                     StatusChip(
-                      label: souscription.statut == StatutSouscription.active ? 'Active' : 'Expirée',
-                      couleur: souscription.statut == StatutSouscription.active ? AppColors.success : AppColors.warning,
+                      label: estActive ? 'Active' : 'En attente de paiement',
+                      couleur: estActive ? AppColors.success : AppColors.warning,
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('${_prix(souscription.soinPrix)} / mois', style: Theme.of(context).textTheme.bodyMedium),
+                Text('${prixFormatte(souscription.soinPrix)} / mois', style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 4),
                 if (souscription.dateFin != null)
                   Text(
                     'Renouvellement le ${_dateCourte(souscription.dateFin!)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+                if (estActive) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton(
+                    onPressed: terminerLoading ? null : () => _terminer(context, ref, souscription),
+                    child: terminerLoading
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Mettre fin à ma souscription'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -125,7 +166,10 @@ class _CatalogueSection extends ConsumerWidget {
     final souscriptions = ref
         .watch(souscriptionsProvider)
         .maybeWhen(data: (d) => d, orElse: () => const <Souscription>[]);
-    final soinActifNom = souscriptions.isNotEmpty ? souscriptions.first.soinNom : null;
+    final soinIdActif = souscriptions
+        .where((s) => s.estBloquante)
+        .map((s) => s.soinId)
+        .firstWhere((id) => id != null, orElse: () => null);
 
     return catalogueAsync.when(
       loading: () => const Padding(
@@ -141,108 +185,13 @@ class _CatalogueSection extends ConsumerWidget {
         child: Column(
           children: [
             for (final soin in soins)
-              _SoinCard(soin: soin, estActif: soin.nom == soinActifNom),
+              SoinCard(
+                soin: soin,
+                estActif: soin.id == soinIdActif,
+                onTap: () => context.push('/soins/${soin.id}'),
+              ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SoinCard extends ConsumerWidget {
-  final SoinCatalogue soin;
-  final bool estActif;
-
-  const _SoinCard({required this.soin, required this.estActif});
-
-  Future<void> _confirmerSouscription(BuildContext context, WidgetRef ref) async {
-    final confirme = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmer la souscription'),
-        content: Text(
-          'Souscrire au forfait "${soin.nom}" pour ${_prix(soin.prix)}/mois ? '
-          'Le paiement sera effectué via mobile money.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Payer et souscrire')),
-        ],
-      ),
-    );
-    if (confirme != true || !context.mounted) return;
-
-    final succes = await ref.read(souscriptionControllerProvider.notifier).souscrire(soin.id);
-    if (!context.mounted) return;
-    if (succes) {
-      context.showInfo('Souscription confirmée, paiement effectué avec succès.');
-    } else {
-      context.showError('Le paiement a échoué, réessayez.');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isLoading = ref.watch(souscriptionControllerProvider).isLoading;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: estActif ? AppColors.primary : AppColors.border, width: estActif ? 1.5 : 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(soin.nom, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16)),
-              ),
-              if (estActif) const StatusChip(label: 'Votre forfait', couleur: AppColors.primary),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(soin.description, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              const Icon(Icons.event_repeat_outlined, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(soin.frequenceVisites, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final prestation in soin.prestationsIncluses)
-                Chip(
-                  label: Text(prestation, style: const TextStyle(fontSize: 11)),
-                  backgroundColor: AppColors.surfaceMuted,
-                  visualDensity: VisualDensity.compact,
-                  side: BorderSide.none,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Text(
-                '${_prix(soin.prix)} / mois',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16, color: AppColors.primaryDark),
-              ),
-              const Spacer(),
-              FilledButton(
-                onPressed: estActif || isLoading ? null : () => _confirmerSouscription(context, ref),
-                child: Text(estActif ? 'Souscrit' : 'Souscrire'),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -316,7 +265,7 @@ class _PaiementTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_prix(paiement.montant)}',
+                  prixFormatte(paiement.montant),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 Text(
