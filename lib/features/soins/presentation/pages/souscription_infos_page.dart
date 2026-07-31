@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../core/errors/app_exception.dart';
-import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../shared/widgets/buttons/app_primary_button.dart';
 import '../../../../shared/widgets/inputs/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../paiement/presentation/pages/paiement_page.dart';
 import '../../domain/entities/soins_entities.dart';
-import '../providers/soins_providers.dart';
 
 /// Formulaire `patientInfo` rempli au moment de la souscription (README
 /// section 0 et 7.1) : allergies, informations santé, régime alimentaire.
@@ -50,21 +47,8 @@ class _SouscriptionInfosPageState extends ConsumerState<SouscriptionInfosPage> {
     super.dispose();
   }
 
-  Future<void> _confirmerEtPayer() async {
+  void _continuerVersPaiement() {
     if (!_formKey.currentState!.validate()) return;
-
-    final confirme = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Payer et souscrire ?'),
-        content: const Text('Le paiement sera effectué via mobile money.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Payer et souscrire')),
-        ],
-      ),
-    );
-    if (confirme != true || !mounted) return;
 
     final allergies = _allergiesController.text
         .split(',')
@@ -80,36 +64,15 @@ class _SouscriptionInfosPageState extends ConsumerState<SouscriptionInfosPage> {
       prenom: _prenomController.text,
     );
 
-    final controller = ref.read(souscriptionControllerProvider.notifier);
-    final succes = await controller.souscrire(soinId: widget.soinId, patientInfo: patientInfo);
-
-    if (!mounted) return;
-
-    if (succes) {
-      final confirmationImmediate = controller.derniereConfirmationImmediate;
-      context.showInfo(
-        confirmationImmediate
-            ? 'Souscription confirmée, paiement effectué avec succès.'
-            : 'Paiement en cours de confirmation. Retrouvez le statut dans l\'onglet Soins.',
-      );
-      // Retour à l'accueil : go_router recalculera aussi le redirect si
-      // l'inscription venait juste d'avoir lieu.
-      if (context.canPop()) {
-        context.go('/accueil');
-      } else {
-        context.go('/accueil');
-      }
-    } else {
-      final erreur = ref.read(souscriptionControllerProvider).asError?.error;
-      final message = erreur is AppException ? erreur.message : 'Le paiement a échoué, réessayez.';
-      context.showError(message);
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaiementPage(soinId: widget.soinId, patientInfo: patientInfo),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(souscriptionControllerProvider).isLoading;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Vos informations santé')),
       body: SafeArea(
@@ -151,9 +114,8 @@ class _SouscriptionInfosPageState extends ConsumerState<SouscriptionInfosPage> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppPrimaryButton(
-                  label: 'Payer et souscrire',
-                  isLoading: isLoading,
-                  onPressed: _confirmerEtPayer,
+                  label: 'Continuer vers le paiement',
+                  onPressed: _continuerVersPaiement,
                 ),
               ],
             ),

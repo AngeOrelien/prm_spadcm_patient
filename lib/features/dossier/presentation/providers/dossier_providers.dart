@@ -12,6 +12,43 @@ final resumePatientProvider = FutureProvider.autoDispose<ResumePatient>((ref) {
   return ref.watch(dossierRemoteDataSourceProvider).obtenirResumePatient();
 });
 
+/// Piloté par le routeur (README onboarding) : tant que ce provider ne
+/// renvoie pas `true`, un compte connecté est redirigé vers
+/// `/onboarding/dossier` plutôt que vers le shell principal — évite les
+/// 404 "compte non relié à une fiche patient" sur le dashboard/dossier/
+/// soins/messagerie tant que le patient n'a pas rempli son dossier.
+final monDossierExisteProvider = FutureProvider.autoDispose<bool>((ref) {
+  final estConnecte = ref.watch(authControllerProvider).value != null;
+  if (!estConnecte) return false;
+  return ref.watch(dossierRemoteDataSourceProvider).monDossierExiste();
+});
+
+/// Contrôleur de l'onboarding "Créer mon dossier" (personnel + médical, en
+/// un seul appel `POST /patients/moi` une fois les deux étapes du
+/// formulaire remplies).
+class CreationDossierController extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<bool> creer(Map<String, dynamic> donnees) async {
+    state = const AsyncLoading();
+    try {
+      await ref.read(dossierRemoteDataSourceProvider).creerMonDossier(donnees);
+      ref.invalidate(monDossierExisteProvider);
+      ref.invalidate(resumePatientProvider);
+      state = const AsyncData(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return false;
+    }
+  }
+}
+
+final creationDossierControllerProvider = AsyncNotifierProvider<CreationDossierController, void>(
+  CreationDossierController.new,
+);
+
 final traitementsProvider = FutureProvider.autoDispose<List<Traitement>>((ref) {
   return ref.watch(dossierRemoteDataSourceProvider).obtenirTraitements();
 });
@@ -41,10 +78,10 @@ class NotationAvsController extends AsyncNotifier<void> {
     state = const AsyncLoading();
     try {
       await ref.read(dossierRemoteDataSourceProvider).noterAvs(
-            rapportId: rapportId,
-            note: note,
-            commentaire: commentaire,
-          );
+        rapportId: rapportId,
+        note: note,
+        commentaire: commentaire,
+      );
       ref.invalidate(appreciationsProvider);
       state = const AsyncData(null);
       return true;

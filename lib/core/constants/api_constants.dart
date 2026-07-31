@@ -87,4 +87,10 @@ class ApiConstants {
   static const String conversations = '/conversations';
   static const String membresFamille = '/patients/moi/membres-famille';
   static const String alertes = '/alertes';
+
+  /// `GET /utilisateurs/role/:role` — annuaire du personnel (médecin,
+  /// coordonnateur, administrateur), ouvert au patient côté backend
+  /// (voir TODO-BACKEND.md, section "annuaire messagerie"). Utilisé par
+  /// l'espace Messagerie pour démarrer une conversation avec l'équipe.
+  static String utilisateursParRole(String role) => '/utilisateurs/role/$role';
 }

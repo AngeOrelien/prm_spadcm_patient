@@ -14,6 +14,7 @@ const List<String> _imagesPresentation = [
   'assets/images/vitrine_presentation_1.jpg',
   'assets/images/vitrine_presentation_2.jpg',
   'assets/images/vitrine_presentation_3.jpg',
+  'assets/images/vitrine_presentation_4.jpg',
 ];
 
 /// Accueil public (README section 3) : présentation SPAD Cameroun +
@@ -60,22 +61,44 @@ class _AppBarVitrine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        0,
+      ),
       child: Row(
         children: [
           Image.asset(
             'assets/images/logo.png',
             height: 36,
-            errorBuilder: (context, error, stackTrace) => const Icon(Icons.favorite_outline, size: 32, color: AppColors.primary),
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.favorite_outline,
+              size: 32,
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'SPAD Cameroun',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontSize: 18),
             ),
           ),
-          TextButton(onPressed: onSeConnecter, child: const Text('Se connecter')),
+          OutlinedButton(
+            onPressed: onSeConnecter,
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 8,
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Se connecter'),
+          ),
         ],
       ),
     );
@@ -88,11 +111,19 @@ class _BlocPresentation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Le suivi de vos proches, à domicile', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            'Le suivi de vos proches, à domicile',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             "SPAD Cameroun accompagne les personnes âgées au quotidien : visites d'auxiliaires de vie, "
@@ -101,7 +132,7 @@ class _BlocPresentation extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
-            height: 140,
+            height: 180,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _imagesPresentation.length,
@@ -110,13 +141,17 @@ class _BlocPresentation extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 child: Image.asset(
                   _imagesPresentation[index],
-                  width: 200,
+                  width: 270,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     width: 200,
                     color: AppColors.surfaceMuted,
                     alignment: Alignment.center,
-                    child: const Icon(Icons.image_outlined, color: AppColors.textDisabled, size: 32),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.textDisabled,
+                      size: 32,
+                    ),
                   ),
                 ),
               ),
@@ -142,7 +177,12 @@ class _BlocVideos extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Une visite en images', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16)),
+          Text(
+            'Une visite en images',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontSize: 16),
+          ),
           const SizedBox(height: AppSpacing.sm),
           AspectRatio(
             aspectRatio: 16 / 9,
@@ -152,7 +192,11 @@ class _BlocVideos extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               alignment: Alignment.center,
-              child: const Icon(Icons.play_circle_fill, size: 56, color: AppColors.primary),
+              child: const Icon(
+                Icons.play_circle_fill,
+                size: 56,
+                color: AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -174,8 +218,16 @@ class SectionTitleVitrine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.sm),
-      child: Text(titre, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18)),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      child: Text(
+        titre,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18),
+      ),
     );
   }
 }
@@ -194,7 +246,10 @@ class _CatalogueVitrineSection extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        child: Text(e is AppException ? e.message : 'Erreur de chargement', style: Theme.of(context).textTheme.bodySmall),
+        child: Text(
+          e is AppException ? e.message : 'Erreur de chargement',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ),
       data: (soins) {
         if (soins.isEmpty) {
@@ -208,7 +263,10 @@ class _CatalogueVitrineSection extends ConsumerWidget {
           child: Column(
             children: [
               for (final SoinCatalogue soin in soins)
-                SoinCard(soin: soin, onTap: () => context.push('/soins-public/${soin.id}')),
+                SoinCard(
+                  soin: soin,
+                  onTap: () => context.push('/soins-public/${soin.id}'),
+                ),
             ],
           ),
         );

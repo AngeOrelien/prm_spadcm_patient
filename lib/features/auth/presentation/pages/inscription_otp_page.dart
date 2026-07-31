@@ -50,12 +50,12 @@ class _InscriptionOtpPageState extends ConsumerState<InscriptionOtpPage> {
     }
 
     // Le compte est désormais connecté (authControllerProvider mis à jour) :
-    // on revient directement au parcours de souscription si un soin était
-    // visé, sinon le router redirige naturellement vers /accueil.
+    // direction obligatoire l'onboarding "Créer mon dossier" (le routeur
+    // l'imposerait de toute façon tant que `POST /patients/moi` n'a pas été
+    // appelé — voir `app_router.dart`). Le soin visé, s'il y en a un, est
+    // transmis en query param et repris à la fin de l'onboarding.
     final soinId = widget.soinId;
-    if (soinId != null) {
-      context.go('/soins/souscrire/$soinId');
-    }
+    context.go('/onboarding/dossier${soinId != null ? '?soinId=$soinId' : ''}');
   }
 
   Future<void> _renvoyerCode() async {

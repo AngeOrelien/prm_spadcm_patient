@@ -141,7 +141,7 @@ class _TableauDeBordContenu extends StatelessWidget {
                 libelle: tableau.alertesOuvertes.isEmpty ? 'Aucune alerte en cours' : 'Alerte(s) en cours',
                 icon: Icons.warning_amber_outlined,
                 couleur: tableau.alertesOuvertes.isEmpty ? AppColors.success : AppColors.sos,
-                onTap: () => context.push('/sos'),
+                onTap: () => context.go('/messages'),
               ),
               StatCard(
                 valeur: '${tableau.documentsRecents.length}',

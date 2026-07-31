@@ -27,6 +27,42 @@ class DossierRemoteDataSource {
     }
   }
 
+  /// `GET /patients/moi` — ne sert ici qu'à savoir si un dossier existe déjà
+  /// pour ce compte (404 -> pas encore créé). Utilisé par le routeur pour
+  /// forcer le parcours d'onboarding (dossier personnel + médical) juste
+  /// après l'inscription, avant de laisser le patient accéder au reste de
+  /// l'app — c'est l'absence de cette étape qui provoquait l'erreur
+  /// "Votre compte n'est pas encore relié à une fiche patient".
+  Future<bool> monDossierExiste() async {
+    try {
+      await _apiClient.dio.get(ApiConstants.monDossier);
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return false;
+      throw ApiClient.toAppException(e);
+    }
+  }
+
+  /// `POST /patients/moi` — création auto-service du dossier (infos
+  /// personnelles + médicales) par le patient lui-même, juste après son
+  /// inscription. Renvoie 409 si un dossier existe déjà pour ce compte.
+  Future<void> creerMonDossier(Map<String, dynamic> donnees) async {
+    try {
+      await _apiClient.dio.post(ApiConstants.monDossier, data: donnees);
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
+  /// `PATCH /patients/moi` — complète/corrige le dossier déjà créé.
+  Future<void> modifierMonDossier(Map<String, dynamic> donnees) async {
+    try {
+      await _apiClient.dio.patch(ApiConstants.monDossier, data: donnees);
+    } on DioException catch (e) {
+      throw ApiClient.toAppException(e);
+    }
+  }
+
   /// `GET /traitements` — le backend déduit automatiquement le patient
   /// depuis le compte connecté (aucun `patientId` à transmettre depuis
   /// l'app Patients/Familles).

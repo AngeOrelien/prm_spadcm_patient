@@ -98,11 +98,17 @@ class SoinsRemoteDataSource {
   Future<String> creerPaiement({
     required String souscriptionId,
     String moyenPaiement = 'mobile_money',
+    String? numeroTelephone,
   }) async {
     try {
       final response = await _apiClient.dio.post(
         ApiConstants.paiements,
-        data: {'souscriptionId': souscriptionId, 'moyenPaiement': moyenPaiement},
+        data: {
+          'souscriptionId': souscriptionId,
+          'moyenPaiement': moyenPaiement,
+          if (numeroTelephone != null && numeroTelephone.trim().isNotEmpty)
+            'numeroTelephone': numeroTelephone.trim(),
+        },
       );
       final data = response.data as Map<String, dynamic>;
       final paiementJson = data['paiement'] as Map<String, dynamic>? ?? data;

@@ -3,15 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/alerte/presentation/pages/sos_page.dart';
 import '../features/auth/presentation/pages/inscription_page.dart';
 import '../features/auth/presentation/pages/login_email_page.dart';
 import '../features/auth/presentation/providers/auth_providers.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/documents/presentation/pages/documents_page.dart';
+import '../features/dossier/presentation/pages/dossier_onboarding_personnel_page.dart';
 import '../features/dossier/presentation/pages/dossier_page.dart';
+import '../features/dossier/presentation/providers/dossier_providers.dart';
 import '../features/messagerie/presentation/pages/messagerie_page.dart';
 import '../features/profil/presentation/pages/profil_page.dart';
+import '../features/soins/presentation/pages/onboarding_souscription_prompt_page.dart';
 import '../features/soins/presentation/pages/soin_detail_page.dart';
 import '../features/soins/presentation/pages/soins_page.dart';
 import '../features/soins/presentation/pages/souscription_infos_page.dart';
@@ -25,6 +27,13 @@ import '../shared/widgets/navigation/patient_shell.dart';
 class _GoRouterRefreshNotifier extends ChangeNotifier {
   _GoRouterRefreshNotifier(Ref ref) {
     ref.listen(authControllerProvider, (previous, next) {
+      notifyListeners();
+    });
+    // Le check "dossier créé ?" (README onboarding) doit lui aussi
+    // déclencher un recalcul du redirect dès qu'il se résout, sinon un
+    // patient nouvellement inscrit resterait bloqué sur l'écran affiché au
+    // moment de la connexion jusqu'au prochain changement de route.
+    ref.listen(monDossierExisteProvider, (previous, next) {
       notifyListeners();
     });
   }
@@ -65,12 +74,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final surSplash = location == '/';
       final surRoutePublique = _estRoutePublique(location);
+      final surOnboarding = location.startsWith('/onboarding');
 
       if (estEnChargement) return surSplash ? null : '/';
       if (!estConnecte) return surRoutePublique ? null : '/vitrine';
-      // Connecté : les écrans "pré-connexion" ne doivent plus s'afficher.
-      if (estConnecte && (surSplash || location == '/login' || location == '/vitrine' || location == '/inscription')) {
+
+      // Onboarding obligatoire "Créer mon dossier" (README) : tant que
+      // `GET /patients/moi` renvoie 404, on bloque l'accès au reste de
+      // l'app pour éviter les erreurs "compte non relié à une fiche
+      // patient" sur le dashboard/dossier/soins/messagerie. Le check est
+      // volontairement permissif tant qu'il n'a pas encore de valeur
+      // (chargement/erreur réseau) pour ne pas bloquer l'app hors-ligne.
+      final dossierExiste = ref.read(monDossierExisteProvider).value;
+      if (dossierExiste == false && !surOnboarding) {
+        return '/onboarding/dossier';
+      }
+      if (dossierExiste == true && surOnboarding) {
         return '/accueil';
+      }
+
+      // Connecté : les écrans "pré-connexion" ne doivent plus s'afficher.
+      if (surSplash || location == '/login' || location == '/vitrine' || location == '/inscription') {
+        return dossierExiste == false ? '/onboarding/dossier' : '/accueil';
       }
       return null;
     },
@@ -105,15 +130,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // --- Écrans plein écran hors bottom navigation ---
-      // Poussés par-dessus le shell (via _rootNavigatorKey) plutôt que
-      // nichés dans un onglet : SOS doit rester atteignable depuis
-      // n'importe quel onglet, Documents est une consultation ponctuelle.
+      // --- Onboarding obligatoire après inscription (README) : créer son
+      // dossier (personnel + médical) avant tout accès au reste de l'app,
+      // puis proposition (facultative) de souscription à un suivi SPAD.
+      // Hors StatefulShellRoute : pas de bottom navigation pendant ce
+      // parcours, comme `/inscription`.
       GoRoute(
-        path: '/sos',
+        path: '/onboarding/dossier',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const SosPage(),
+        builder: (context, state) => DossierOnboardingPersonnelPage(
+          soinId: state.uri.queryParameters['soinId'],
+        ),
       ),
+      GoRoute(
+        path: '/onboarding/souscription',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const OnboardingSouscriptionPromptPage(),
+      ),
+
+      // --- Écrans plein écran hors bottom navigation ---
+      // Poussé par-dessus le shell (via _rootNavigatorKey) plutôt que niché
+      // dans un onglet : Documents est une consultation ponctuelle. (Le
+      // bouton SOS a été retiré du shell : "Signaler une urgence" vit
+      // maintenant dans l'espace Messagerie, voir `messagerie_page.dart`.)
       GoRoute(
         path: '/documents',
         parentNavigatorKey: _rootNavigatorKey,

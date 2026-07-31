@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../../dashboard/presentation/widgets/patient_dashboard_header.dart';
 import '../../../dossier/presentation/providers/dossier_providers.dart';
 import '../../domain/entities/profil_entities.dart';
 import '../providers/profil_providers.dart';
@@ -23,10 +24,14 @@ class ProfilPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Profil')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      body: Column(
         children: [
+          const PatientDashboardHeader.page(title: 'Profil', subtitle: 'Compte, famille et sécurité'),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [
           CircleAvatar(
             radius: 36,
             backgroundColor: AppColors.primarySurface,
@@ -67,6 +72,9 @@ class ProfilPage extends ConsumerWidget {
             icon: const Icon(Icons.logout, color: AppColors.error),
             label: const Text('Déconnexion', style: TextStyle(color: AppColors.error)),
             style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
+          ),
+              ],
+            ),
           ),
         ],
       ),

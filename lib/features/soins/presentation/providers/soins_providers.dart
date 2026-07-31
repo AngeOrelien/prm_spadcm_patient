@@ -49,18 +49,43 @@ class SouscriptionController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<bool> souscrire({
+  /// Étape 1 : crée la souscription (`en_attente_paiement`) sans encore
+  /// payer — c'est ce que la nouvelle `PaiementPage` appelle avant de
+  /// proposer "Payer maintenant" / "Payer plus tard".
+  Future<String?> creerSouscription({
     required String soinId,
     PatientInfoSouscription? patientInfo,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final souscriptionId = await ref.read(soinsRemoteDataSourceProvider).souscrire(
+            soinId: soinId,
+            patientInfo: patientInfo,
+          );
+      ref.invalidate(souscriptionsProvider);
+      state = const AsyncData(null);
+      return souscriptionId;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return null;
+    }
+  }
+
+  /// Étape 2 (immédiate) : paiement mobile money simulé via un numéro de
+  /// téléphone. En production (Vercel), la simulation n'est pas appelée :
+  /// la souscription reste `en_attente_paiement` jusqu'au webhook réel.
+  Future<bool> payer({
+    required String souscriptionId,
+    required String numeroTelephone,
     String moyenPaiement = 'mobile_money',
   }) async {
     state = const AsyncLoading();
     try {
       final dataSource = ref.read(soinsRemoteDataSourceProvider);
-      final souscriptionId = await dataSource.souscrire(soinId: soinId, patientInfo: patientInfo);
       final paiementId = await dataSource.creerPaiement(
         souscriptionId: souscriptionId,
         moyenPaiement: moyenPaiement,
+        numeroTelephone: numeroTelephone,
       );
 
       _derniereConfirmationImmediate = !EnvConfig.isVercel;
@@ -77,6 +102,19 @@ class SouscriptionController extends AsyncNotifier<void> {
       state = AsyncError(e, st);
       return false;
     }
+  }
+
+  /// Conservé pour compatibilité (ancien flux "payer directement") :
+  /// enchaîne les deux étapes ci-dessus en un seul appel.
+  Future<bool> souscrire({
+    required String soinId,
+    PatientInfoSouscription? patientInfo,
+    required String numeroTelephone,
+    String moyenPaiement = 'mobile_money',
+  }) async {
+    final souscriptionId = await creerSouscription(soinId: soinId, patientInfo: patientInfo);
+    if (souscriptionId == null) return false;
+    return payer(souscriptionId: souscriptionId, numeroTelephone: numeroTelephone, moyenPaiement: moyenPaiement);
   }
 }
 

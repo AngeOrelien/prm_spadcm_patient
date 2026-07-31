@@ -7,6 +7,7 @@ import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../../dashboard/presentation/widgets/patient_dashboard_header.dart';
 import '../../domain/entities/soins_entities.dart';
 import '../providers/soins_providers.dart';
 import '../widgets/soin_card.dart';
@@ -27,24 +28,31 @@ class SoinsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Soins')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(catalogueSoinsProvider);
-          ref.invalidate(souscriptionsProvider);
-          ref.invalidate(paiementsProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-          children: [
-            const SectionTitle(titre: 'Votre souscription'),
-            const _SouscriptionActiveSection(),
-            const SectionTitle(titre: 'Catalogue de soins'),
-            const _CatalogueSection(),
-            const SectionTitle(titre: 'Historique des paiements'),
-            const _HistoriquePaiementsSection(),
-          ],
-        ),
+      body: Column(
+        children: [
+          const PatientDashboardHeader.page(title: 'Soins', subtitle: 'Catalogue, souscription et paiements'),
+          const Divider(height: 1),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(catalogueSoinsProvider);
+                ref.invalidate(souscriptionsProvider);
+                ref.invalidate(paiementsProvider);
+              },
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+                children: [
+                  const SectionTitle(titre: 'Votre souscription'),
+                  const _SouscriptionActiveSection(),
+                  const SectionTitle(titre: 'Catalogue de soins'),
+                  const _CatalogueSection(),
+                  const SectionTitle(titre: 'Historique des paiements'),
+                  const _HistoriquePaiementsSection(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

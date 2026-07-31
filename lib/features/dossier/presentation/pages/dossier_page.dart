@@ -6,6 +6,7 @@ import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../dashboard/presentation/widgets/dashboard_widgets.dart';
+import '../../../dashboard/presentation/widgets/patient_dashboard_header.dart';
 import '../../domain/entities/dossier_entities.dart';
 import '../providers/dossier_providers.dart';
 import '../widgets/evolution_chart.dart';
@@ -27,33 +28,40 @@ class DossierPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Dossier médical')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(resumePatientProvider);
-          ref.invalidate(traitementsProvider);
-          ref.invalidate(rapportsJournaliersProvider);
-          ref.invalidate(appreciationsProvider);
-          ref.invalidate(documentsMedicauxProvider);
-          ref.invalidate(rendezVousProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-          children: const [
-            SectionTitle(titre: 'Fiche patient'),
-            _ResumePatientSection(),
-            SectionTitle(titre: 'Évolution des constantes (analyse IA)'),
-            _EvolutionSection(),
-            SectionTitle(titre: 'Traitement en cours'),
-            _TraitementsSection(),
-            _RapportsSectionTitle(),
-            _RapportsSection(),
-            _DocumentsSectionTitle(),
-            _DocumentsSection(),
-            _RendezVousSectionTitle(),
-            _RendezVousSection(),
-          ],
-        ),
+      body: Column(
+        children: [
+          const PatientDashboardHeader.page(title: 'Dossier médical', subtitle: 'Fiche patient et suivi'),
+          const Divider(height: 1),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(resumePatientProvider);
+                ref.invalidate(traitementsProvider);
+                ref.invalidate(rapportsJournaliersProvider);
+                ref.invalidate(appreciationsProvider);
+                ref.invalidate(documentsMedicauxProvider);
+                ref.invalidate(rendezVousProvider);
+              },
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+                children: const [
+                  SectionTitle(titre: 'Fiche patient'),
+                  _ResumePatientSection(),
+                  SectionTitle(titre: 'Évolution des constantes (analyse IA)'),
+                  _EvolutionSection(),
+                  SectionTitle(titre: 'Traitement en cours'),
+                  _TraitementsSection(),
+                  _RapportsSectionTitle(),
+                  _RapportsSection(),
+                  _DocumentsSectionTitle(),
+                  _DocumentsSection(),
+                  _RendezVousSectionTitle(),
+                  _RendezVousSection(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
