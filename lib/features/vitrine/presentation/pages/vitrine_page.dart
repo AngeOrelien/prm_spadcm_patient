@@ -93,7 +93,7 @@ class _AppBarVitrine extends StatelessWidget {
               minimumSize: Size.zero,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
-                vertical: 8,
+                vertical: 15,
               ),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
