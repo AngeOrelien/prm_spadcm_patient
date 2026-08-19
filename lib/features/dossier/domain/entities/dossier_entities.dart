@@ -22,6 +22,11 @@ class ResumePatient {
   final List<String> difficultesMobilite;
   final ContactUrgenceDossier? contactUrgence;
 
+  /// Nom complet de l'AVS assigné au patient (déduit de `avsAssigne`, à côté
+  /// de `patient` dans la réponse de `GET /patients/moi`). `null` tant
+  /// qu'aucun·e AVS n'a été assigné·e par un coordonnateur.
+  final String? avsNom;
+
   const ResumePatient({
     required this.nom,
     required this.prenom,
@@ -33,6 +38,7 @@ class ResumePatient {
     this.allergies = const [],
     this.difficultesMobilite = const [],
     this.contactUrgence,
+    this.avsNom,
   });
 
   String get nomComplet => '$prenom $nom';

@@ -4,8 +4,12 @@ DateTime? _dateOrNull(dynamic value) => value == null ? null : DateTime.tryParse
 DateTime _dateOrNow(dynamic value) => _dateOrNull(value) ?? DateTime.now();
 
 class ResumePatientModel {
-  static ResumePatient fromJson(Map<String, dynamic> json) {
+  /// [avsJson] correspond à `avsAssigne` dans la réponse de
+  /// `GET /patients/moi` — un objet frère de `patient` (pas imbriqué dedans),
+  /// donc transmis séparément par [DossierRemoteDataSource.obtenirResumePatient].
+  static ResumePatient fromJson(Map<String, dynamic> json, {Map<String, dynamic>? avsJson}) {
     final contact = json['contactUrgence'] as Map<String, dynamic>?;
+    final avsNom = avsJson == null ? null : '${avsJson['prenom'] ?? ''} ${avsJson['nom'] ?? ''}'.trim();
     return ResumePatient(
       nom: json['nom'] as String? ?? '',
       prenom: json['prenom'] as String? ?? '',
@@ -23,6 +27,7 @@ class ResumePatientModel {
               lien: contact['lien'] as String?,
               telephone: contact['telephone'] as String?,
             ),
+      avsNom: (avsNom == null || avsNom.isEmpty) ? null : avsNom,
     );
   }
 }

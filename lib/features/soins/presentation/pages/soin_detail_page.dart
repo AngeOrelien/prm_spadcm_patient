@@ -267,16 +267,16 @@ class _BoutonAction extends ConsumerWidget {
 /// Lecteur vidéo minimal (`video_player`) pour les courtes vidéos illustrant
 /// un soin. Supporte à la fois une URL réseau et un asset local
 /// (`assets/videos/...`) pour démarrer sans backend média.
-class _InlineVideoPlayer extends StatefulWidget {
+class _InlineVideoPlayer extends ConsumerStatefulWidget {
   final String url;
 
   const _InlineVideoPlayer({required this.url});
 
   @override
-  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+  ConsumerState<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
 }
 
-class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
+class _InlineVideoPlayerState extends ConsumerState<_InlineVideoPlayer> {
   VideoPlayerController? _controller;
   bool _erreur = false;
 
@@ -288,9 +288,27 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
 
   Future<void> _initialiser() async {
     try {
-      final controller = widget.url.startsWith('http')
-          ? VideoPlayerController.networkUrl(Uri.parse(widget.url))
-          : VideoPlayerController.asset(widget.url);
+      VideoPlayerController controller;
+      if (widget.url.startsWith('http')) {
+        // `video_player` fait sa propre requête HTTP en dehors de Dio : le
+        // token d'accès n'est donc jamais attaché automatiquement comme sur
+        // le reste de l'app (voir `ApiClient`), et le backend répond 401
+        // ("Non autorisé, token manquant") si la route du fichier vidéo est
+        // protégée par `authMiddleware`. On l'attache donc ici à la main.
+        //
+        // NB : ce correctif ne couvre que le contexte connecté. Ce même
+        // écran est aussi poussé sans authentification depuis la vitrine
+        // publique (`/soins-public/:id`), où il n'y a par définition aucun
+        // token à envoyer — la vraie correction est côté backend, voir
+        // TODO-BACKEND.md ("Vidéos des soins accessibles sans authentification").
+        final token = await ref.read(secureStorageServiceProvider).getAccessToken();
+        controller = VideoPlayerController.networkUrl(
+          Uri.parse(widget.url),
+          httpHeaders: token != null ? {'Authorization': 'Bearer $token'} : const {},
+        );
+      } else {
+        controller = VideoPlayerController.asset(widget.url);
+      }
       await controller.initialize();
       if (!mounted) {
         controller.dispose();

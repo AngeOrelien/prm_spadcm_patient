@@ -10,6 +10,7 @@ import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/documents/presentation/pages/documents_page.dart';
 import '../features/dossier/presentation/pages/dossier_onboarding_personnel_page.dart';
 import '../features/dossier/presentation/pages/dossier_page.dart';
+import '../features/dossier/presentation/pages/notation_avs_page.dart';
 import '../features/dossier/presentation/providers/dossier_providers.dart';
 import '../features/messagerie/presentation/pages/messagerie_page.dart';
 import '../features/profil/presentation/pages/profil_page.dart';
@@ -157,6 +158,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/documents',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const DocumentsPage(),
+      ),
+
+      // --- Notation de l'AVS (UC7), consultation ponctuelle poussée
+      // depuis l'onglet Dossier, même logique que Documents ci-dessus. ---
+      GoRoute(
+        path: '/dossier/notation-avs',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotationAvsPage(),
       ),
 
       // --- Détail d'un soin authentifié + formulaire de souscription ---

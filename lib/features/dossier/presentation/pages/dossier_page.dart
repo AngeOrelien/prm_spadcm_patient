@@ -306,7 +306,13 @@ class _RapportsSectionTitle extends StatelessWidget {
   const _RapportsSectionTitle();
 
   @override
-  Widget build(BuildContext context) => const SectionTitle(titre: 'Rapports journaliers de l\'AVS');
+  Widget build(BuildContext context) => SectionTitle(
+        titre: 'Rapports journaliers de l\'AVS',
+        trailing: TextButton(
+          onPressed: () => context.push('/dossier/notation-avs'),
+          child: const Text('Noter l\'AVS'),
+        ),
+      );
 }
 
 class _RapportsSection extends ConsumerWidget {

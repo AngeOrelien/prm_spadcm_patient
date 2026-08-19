@@ -76,8 +76,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-        hintStyle: const TextStyle(color: AppColors.textDisabled),
+        // ⚠️ labelStyle/hintStyle priment sur `textTheme` dès qu'ils sont
+        // fournis explicitement : un TextStyle brut ici casse la police
+        // custom même si le reste de l'app l'a bien (même piège que pour
+        // chipTheme plus bas). Toujours passer par AppFonts.style(...).
+        labelStyle: AppFonts.style(const TextStyle(color: AppColors.textSecondary)),
+        hintStyle: AppFonts.style(const TextStyle(color: AppColors.textDisabled)),
       ),
 
       filledButtonTheme: FilledButtonThemeData(
@@ -115,6 +119,20 @@ class AppTheme {
 
       checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+
+      // Chip/ActionChip/ChoiceChip lisent `labelStyle` en priorité et
+      // ignorent `textTheme` — sans ce thème explicite, tous les `Chip(...)`
+      // de l'app (soins, prestations, tags du dossier, etc.) retombent sur
+      // la police système au lieu d'Ubuntu Sans. Voir `app_fonts.dart`.
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.surfaceMuted,
+        selectedColor: AppColors.primarySurface,
+        labelStyle: AppFonts.style(const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+        secondaryLabelStyle: AppFonts.style(const TextStyle(color: AppColors.onPrimary, fontSize: 13)),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
       ),
 
       dividerTheme: const DividerThemeData(

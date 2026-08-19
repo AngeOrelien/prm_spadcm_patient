@@ -21,7 +21,10 @@ class DossierRemoteDataSource {
     try {
       final response = await _apiClient.dio.get(ApiConstants.monDossier);
       final data = response.data as Map<String, dynamic>;
-      return ResumePatientModel.fromJson(data['patient'] as Map<String, dynamic>);
+      return ResumePatientModel.fromJson(
+        data['patient'] as Map<String, dynamic>,
+        avsJson: data['avsAssigne'] as Map<String, dynamic>?,
+      );
     } on DioException catch (e) {
       throw ApiClient.toAppException(e);
     }
